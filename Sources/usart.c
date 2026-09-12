@@ -10,8 +10,8 @@
 #include "debug_uart.h"
 
 UART_HandleTypeDef huart1;
-DMA_HandleTypeDef hdma_tx;
-DMA_HandleTypeDef hdma_rx;
+//DMA_HandleTypeDef hdma_tx;
+//DMA_HandleTypeDef hdma_rx;
 
 
 void MX_USART1_UART_Init(void)
@@ -136,12 +136,12 @@ void USART1_IRQHandler(void)
     HAL_UART_IRQHandler(&huart1);
 }
 
-void DMA1_Channel4_IRQHandler(void)
-{
-    HAL_DMA_IRQHandler(huart1.hdmatx);
-}
-
-void DMA1_Channel5_IRQHandler(void)
-{
-    HAL_DMA_IRQHandler(huart1.hdmarx);
-}
+//void DMA1_Channel4_IRQHandler(void)
+//{
+//    HAL_DMA_IRQHandler(huart1.hdmatx);
+//}
+//
+//void DMA1_Channel5_IRQHandler(void)
+//{
+//    HAL_DMA_IRQHandler(huart1.hdmarx);
+//}

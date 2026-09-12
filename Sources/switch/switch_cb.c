@@ -407,9 +407,9 @@ void switch_pro_handle_output(const uint8_t *data, uint16_t len)
 }
 
 
-static void input_state_reset(void)
+void input_state_reset(void)
 {
-    memset(&input_state, 0, sizeof(switch_pro_input_state));
+    memset(&input_state, 0, sizeof(input_state));
 
     // Centred sticks
     input_state.stick_l[0] = 0x7FF;

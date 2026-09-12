@@ -8,6 +8,7 @@ static const char msg_player = 'p';
 static const char msg_imu = 'i';
 static const char msg_rumble = 'r';
 static const char msg_tail = 0xFF;
+//static const char msg_tail = '\n';
 
 void debug_init(UART_HandleTypeDef *huart)
 {

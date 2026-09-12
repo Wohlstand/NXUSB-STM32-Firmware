@@ -169,6 +169,8 @@ int main(void)
     debug_init(&huart1);
     debug_println("=== Auto Switch Pro boot ===");
 
+    input_state_reset();
+
     // LED on at boot (PB2, active-low)
     HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
 
