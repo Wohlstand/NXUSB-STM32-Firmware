@@ -41,11 +41,10 @@ void SystemClock_Config(void);
 // ---- UART Command Protocol ----
 #define CMD_START 0xAA
 
-// UART RX state machine — runs entirely in ISR for zero-latency re-arm
-static uint8_t    rx_byte = 0;
+static struct NXSendCmd rx_cmd;
 
 // Command received from ISR, processed in main loop
-static volatile uint8_t pending_cmd = 0;  // 'R', 'P', or 0 (none)
+static volatile uint8_t pending_cmd = CMD_None;  // 'R', 'P', or 0 (none)
 
 // Reset macro state: buttons for 500ms, then idle for 1500ms, then resume A
 static volatile bool     reset_active = false;
@@ -80,21 +79,33 @@ static void send_ack(void)
 // Start listening for one byte (non-blocking, interrupt-driven)
 static void uart_listen(void)
 {
-    HAL_UART_Receive_IT(&huart1, &rx_byte, 1);
+    HAL_UART_Receive_IT(&huart1, (uint8_t*)&rx_cmd.cmd, 1);
+    // sizeof(rx_cmd)
 }
+
+static uint8_t got_data = 0;
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
     if(huart->Instance != USART1)
         return;
 
-    if(rx_byte == 'R' || rx_byte == 'r' || rx_byte == 'P' || rx_byte == 'p' ||
-       rx_byte == 'a' || rx_byte == 'w' || rx_byte == 's' || rx_byte == 'd' ||
-       rx_byte == '1' || rx_byte == '2' || rx_byte == '3' || rx_byte == '4' ||
-       rx_byte == '5' || rx_byte == '6')
-        pending_cmd = rx_byte;
-
-    uart_listen();
+    if(!got_data)
+    {
+        if(rx_cmd.cmd != CMD_None && rx_cmd.cmd <= CMD_Reset)
+        {
+            got_data = 1;
+            HAL_UART_Receive_IT(&huart1, (uint8_t*)&rx_cmd.data, sizeof(rx_cmd) - 1);
+        }
+        else
+            uart_listen();
+    }
+    else
+    {
+        pending_cmd = rx_cmd.cmd;
+        got_data = 0;
+        uart_listen();
+    }
 }
 
 // Process pending commands in main loop (debug prints + ACK)
@@ -102,31 +113,33 @@ static void uart_poll(void)
 {
     uint8_t cmd = pending_cmd;
 
-    cmd = pending_cmd;
-
-    if(cmd == 0)
+    if(cmd == CMD_None)
         return;
 
-    pending_cmd = 0;
+    pending_cmd = CMD_None;
 
     switch(cmd)
     {
-    case 'R':
-    case 'r':
+    case CMD_Reset:
         reset_active = true;
         reset_start_ms = HAL_GetTick();
         reset_pause_ms = rand_range(2000, 4000);
         send_ack();
         debug_println("[CMD] RESET");
         break;
-    case 'P':
-    case 'p':
+
+    case CMD_Ping:
         send_ack();
         debug_println("[CMD] PING");
         break;
 
+    case CMD_ButtonsUpdate:
+        debug_println("[CMD] Update buttons");
+        switch_receive(&rx_cmd);
+        break;
+
     default:
-        switch_hit(cmd);
+        debug_println("[CMD] Invalid command!");
         break;
     }
 }
@@ -140,6 +153,8 @@ int main(void)
         .role = TUSB_ROLE_DEVICE,
         .speed = TUSB_SPEED_FULL
     };
+
+    rx_cmd.cmd = CMD_None;
 
     HAL_Init();
 

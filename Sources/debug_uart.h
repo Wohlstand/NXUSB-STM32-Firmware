@@ -9,6 +9,14 @@ extern void debug_init(UART_HandleTypeDef *huart);
 // Print a string (blocking, for debug only)
 extern void debug_print(const char *str);
 
+extern void debug_print_begin(void);
+extern void debug_print_end(void);
+
+extern void debug_imu_state(uint8_t enabled);
+extern void debug_palyer(uint8_t player);
+
+extern void debug_rumble(uint8_t *samples, uint8_t size);
+
 // Print a hex byte
 extern void debug_hex8(uint8_t val);
 

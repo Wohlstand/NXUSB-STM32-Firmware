@@ -17,6 +17,8 @@
 // ---- Pro Controller protocol state ----
 switch_pro_state_t pro_state;
 
+static switch_pro_input_state input_state;
+
 // ---- SPI Flash Data (factory calibration / configuration) ----
 // Based on GP2040-CE and SwitchDualShockAdapter — addresses the Switch reads
 
@@ -270,7 +272,9 @@ static void handle_subcommand(const uint8_t *data, uint16_t len)
 
     uint8_t subcmd = data[10]; // subcommand ID is at offset 10
 
-    debug_print("[01] sub="); debug_hex8(subcmd); debug_print("\r\n");
+    debug_print_begin();
+    debug_print("[01] sub="); debug_hex8(subcmd);
+    debug_print_end();
 
     switch(subcmd)
     {
@@ -333,6 +337,7 @@ static void handle_subcommand(const uint8_t *data, uint16_t len)
         pro_state.player_id = data[11];
         buf[13] = 0x80;
         buf[14] = subcmd;
+        debug_palyer(pro_state.player_id);
         break;
 
     case SUBCMD_GET_PLAYER_LIGHTS:
@@ -345,6 +350,7 @@ static void handle_subcommand(const uint8_t *data, uint16_t len)
         pro_state.imu_enabled = data[11] == 0x01 ? true : false;
         buf[13] = 0x80;
         buf[14] = subcmd;
+        debug_imu_state((uint8_t)pro_state.imu_enabled);
         break;
 
     case SUBCMD_IMU_SENSITIVITY:
@@ -401,6 +407,17 @@ void switch_pro_handle_output(const uint8_t *data, uint16_t len)
 }
 
 
+static void input_state_reset(void)
+{
+    memset(&input_state, 0, sizeof(switch_pro_input_state));
+
+    // Centred sticks
+    input_state.stick_l[0] = 0x7FF;
+    input_state.stick_l[1] = 0x7FF;
+    input_state.stick_r[0] = 0x7FF;
+    input_state.stick_r[1] = 0x7FF;
+}
+
 // ---- TinyUSB callbacks ----
 void tud_mount_cb(void)
 {
@@ -409,6 +426,7 @@ void tud_mount_cb(void)
     pro_state.reports_enabled = false;
     pro_state.report_counter = 0;
     report_queued = false;
+    input_state_reset();
 }
 
 void tud_umount_cb(void)
@@ -416,6 +434,7 @@ void tud_umount_cb(void)
     debug_println("[USB] UNMOUNTED");
     pro_state.handshake_done = false;
     pro_state.reports_enabled = false;
+    input_state_reset();
 }
 
 void tud_suspend_cb(bool remote_wakeup_en)
@@ -459,73 +478,33 @@ bool switch_pro_send_queued(void)
     return true;
 }
 
-static uint32_t phase_start = 0;
-static uint32_t phase_status = 0;
 
-enum Phases
-{
-    PHASE_IDLE = 0,
-    PHASE_LR = 1,
-    PHASE_A,
-    PHASE_B,
-    PHASE_X,
-    PHASE_Y,
-    PHASE_DPAD_L,
-    PHASE_DPAD_R,
-    PHASE_DPAD_U,
-    PHASE_DPAD_D,
-    PHASE_L,
-    PHASE_R,
-};
 
-void switch_hit(char key)
+void switch_receive(const struct NXSendCmd *in)
 {
-    switch(key)
+    switch(in->cmd)
     {
-    case '1':
-        phase_status = PHASE_A;
+    case CMD_ButtonsUpdate:
+        input_state.buttons = in->data.state.buttons;
+        memcpy(input_state.stick_l, in->data.state.stick_l, sizeof(uint16_t) * 2);
+        memcpy(input_state.stick_r, in->data.state.stick_r, sizeof(uint16_t) * 2);
         break;
-    case '2':
-        phase_status = PHASE_B;
+
+    case CMD_Tilt:
+        memcpy(input_state.accel[0], in->data.tilt.accel, sizeof(uint16_t) * 3);
+        memcpy(input_state.gyro[0], in->data.tilt.gyro, sizeof(uint16_t) * 3);
         break;
-    case '3':
-        phase_status = PHASE_X;
-        break;
-    case '4':
-        phase_status = PHASE_Y;
-        break;
-    case '5':
-        phase_status = PHASE_L;
-        break;
-    case '6':
-        phase_status = PHASE_R;
-        break;
-    case 'w':
-        phase_status = PHASE_DPAD_U;
-        break;
-    case 'a':
-        phase_status = PHASE_DPAD_L;
-        break;
-    case 's':
-        phase_status = PHASE_DPAD_D;
-        break;
-    case 'd':
-        phase_status = PHASE_DPAD_R;
-        break;
+
     default:
-        return;
+        break;
     }
-    phase_start = 0;
 }
+
 
 void switch_update_state(void)
 {
     if(!pro_state.reports_enabled)
-    {
-        phase_start = 0;
-        phase_status = PHASE_LR;
         return;
-    }
 
     static uint32_t last_report_ms = 0;
     uint32_t now = HAL_GetTick();
@@ -543,81 +522,17 @@ void switch_update_state(void)
         // Battery good, USB connection
         report.input.battery_level = 0x08;
         report.input.connection_info = 0x00;
-        report.input.charging = 1;
+//        report.input.charging = 1;
 
-        // Left stick held up-center, right stick at centre (12-bit: 0x7FF = 2047)
-        switch_analog_set_xy(&report.input.left_stick,  0x7FF, 0x7FF);
-        switch_analog_set_xy(&report.input.right_stick, 0x7FF, 0x7FF);
+        switch_analog_set_xy(&report.input.left_stick,  input_state.stick_l[0], input_state.stick_l[1]);
+        switch_analog_set_xy(&report.input.right_stick, input_state.stick_r[0], input_state.stick_r[1]);
 
         // Vibro-motor report
         report.rumble_report = 0x00;
 
-        // ---- Button automation ----
-        if(phase_start == 0)
-            phase_start = now;
-
-        uint32_t elapsed = now - phase_start;
-
-        if(phase_status == PHASE_LR)
-        {
-            if(elapsed < 3000)
-            {
-                // First 3 seconds: press L+R to register on Grip/Order screen
-                report.input.btn_l = 1;
-                report.input.btn_r = 1;
-            }
-            else
-            {
-                phase_status = PHASE_IDLE;
-            }
-        }
-        else if(phase_status != PHASE_IDLE)
-        {
-            if(elapsed < 100)
-            {
-                switch(phase_status)
-                {
-                case PHASE_A:
-                    report.input.btn_a = 1;
-                    break;
-                case PHASE_B:
-                    report.input.btn_b = 1;
-                    break;
-                case PHASE_X:
-                    report.input.btn_x = 1;
-                    break;
-                case PHASE_Y:
-                    report.input.btn_y = 1;
-                    break;
-
-                case PHASE_L:
-                    report.input.btn_l = 1;
-                    break;
-                case PHASE_R:
-                    report.input.btn_r = 1;
-                    break;
-
-                case PHASE_DPAD_L:
-                    report.input.dpad_left = 1;
-                    break;
-                case PHASE_DPAD_R:
-                    report.input.dpad_right = 1;
-                    break;
-                case PHASE_DPAD_U:
-                    report.input.dpad_up = 1;
-                    break;
-                case PHASE_DPAD_D:
-                    report.input.dpad_down = 1;
-                    break;
-                default:
-                    break;
-                }
-            }
-            else
-            {
-                phase_status = PHASE_IDLE;
-            }
-        }
+        report.input.m_button_status[0] = (input_state.buttons >> 16) & 0xFF;
+        report.input.m_button_status[1] = ((input_state.buttons >> 8) & 0xFF) | ((BUTTON_CHARGING >> 8) & 0xFF);
+        report.input.m_button_status[2] = (input_state.buttons) & 0xFF;
 
         tud_hid_report(0, &report, sizeof(report));
     }

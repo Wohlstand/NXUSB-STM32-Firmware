@@ -97,72 +97,90 @@ static inline void switch_set_gyroscope(uint8_t *imu, size_t sample, int16_t x, 
     analogue_int16_to_le(z, imu + sample + (sample * 12) + 6 + 4);
 }
 
-//enum NxBtButtons
-//{
-//    Y               = 0x01,
-//    X               = 0x02,
-//    B               = 0x04,
-//    A               = 0x08,
-//    JCL_SR          = 0x10,
-//    JCL_SL          = 0x20,
-//    R               = 0x40,
-//    ZR              = 0x80,
-//
-//    PLUS            = 0x01,
-//    MINUS           = 0x02,
-//    R_STICK_PRESS   = 0x04,
-//    L_STICK_PRESS   = 0x08,
-//    HOME            = 0x10,
-//    CAPTURE         = 0x20,
-//    PADDING         = 0x40,
-//    CHARGING        = 0x80,
-//
-//    DPAD_DOWN       = 0x01,
-//    DPAD_UP         = 0x02,
-//    DPAD_RIGHT      = 0x04,
-//    DPAD_LEFT       = 0x08,
-//    JCR_SR          = 0x10,
-//    JCR_SL          = 0x20,
-//    L               = 0x40,
-//    ZL              = 0x80,
-//};
+enum NxBtButtons
+{
+    BUTTON_Y               = 0x00010000,
+    BUTTON_X               = 0x00020000,
+    BUTTON_B               = 0x00040000,
+    BUTTON_A               = 0x00080000,
+    BUTTON_JCR_SR          = 0x00100000,
+    BUTTON_JCR_SL          = 0x00200000,
+    BUTTON_R               = 0x00400000,
+    BUTTON_ZR              = 0x00800000,
+
+    BUTTON_PLUS            = 0x00000100,
+    BUTTON_MINUS           = 0x00000200,
+    BUTTON_R_STICK_PRESS   = 0x00000400,
+    BUTTON_L_STICK_PRESS   = 0x00000800,
+    BUTTON_HOME            = 0x00001000,
+    BUTTON_CAPTURE         = 0x00002000,
+    BUTTON_PADDING         = 0x00004000,
+    BUTTON_CHARGING        = 0x00008000,
+
+    BUTTON_DPAD_DOWN       = 0x00000001,
+    BUTTON_DPAD_UP         = 0x00000002,
+    BUTTON_DPAD_RIGHT      = 0x00000004,
+    BUTTON_DPAD_LEFT       = 0x00000008,
+    BUTTON_JCL_SR          = 0x00000010,
+    BUTTON_JCL_SL          = 0x00000020,
+    BUTTON_L               = 0x00000040,
+    BUTTON_ZL              = 0x00000080,
+
+    BUTTON_BEGIN = BUTTON_DPAD_DOWN,
+    BUTTON_END = (BUTTON_ZR << 1)
+};
+
+typedef struct
+{
+    uint32_t buttons;
+    uint16_t stick_l[2];
+    uint16_t stick_r[2];
+
+    // Accelerometer
+    uint16_t accel[3][3];
+    uint8_t  accel_count;
+
+    // Gyroscope
+    uint16_t gyro[3][3];
+    uint8_t  gyro_count;
+} switch_pro_input_state;
 
 typedef struct __attribute__((packed))
 {
     uint8_t connection_info : 4;
     uint8_t battery_level   : 4;
 
-//    uint8_t m_button_status[3];
+    uint8_t m_button_status[3];
 
-    // byte 0: right-side buttons + triggers
-    uint8_t btn_y       : 1;
-    uint8_t btn_x       : 1;
-    uint8_t btn_b       : 1;
-    uint8_t btn_a       : 1;
-    uint8_t btn_rsr     : 1;  // Right SR (JoyCon)
-    uint8_t btn_rsl     : 1;  // Right SL (JoyCon)
-    uint8_t btn_r       : 1;
-    uint8_t btn_zr      : 1;
-
-    // byte 1: shared buttons
-    uint8_t btn_minus   : 1;
-    uint8_t btn_plus    : 1;
-    uint8_t btn_rstick  : 1;
-    uint8_t btn_lstick  : 1;
-    uint8_t btn_home    : 1;
-    uint8_t btn_capture : 1;
-    uint8_t _pad0       : 1;
-    uint8_t charging    : 1;
-
-    // byte 2: left-side buttons + triggers
-    uint8_t dpad_down   : 1;
-    uint8_t dpad_up     : 1;
-    uint8_t dpad_right  : 1;
-    uint8_t dpad_left   : 1;
-    uint8_t btn_lsr     : 1;  // Left SR (JoyCon)
-    uint8_t btn_lsl     : 1;  // Left SL (JoyCon)
-    uint8_t btn_l       : 1;
-    uint8_t btn_zl      : 1;
+//    // byte 0: right-side buttons + triggers
+//    uint8_t btn_y       : 1;
+//    uint8_t btn_x       : 1;
+//    uint8_t btn_b       : 1;
+//    uint8_t btn_a       : 1;
+//    uint8_t btn_rsr     : 1;  // Right SR (JoyCon)
+//    uint8_t btn_rsl     : 1;  // Right SL (JoyCon)
+//    uint8_t btn_r       : 1;
+//    uint8_t btn_zr      : 1;
+//
+//    // byte 1: shared buttons
+//    uint8_t btn_minus   : 1;
+//    uint8_t btn_plus    : 1;
+//    uint8_t btn_rstick  : 1;
+//    uint8_t btn_lstick  : 1;
+//    uint8_t btn_home    : 1;
+//    uint8_t btn_capture : 1;
+//    uint8_t _pad0       : 1;
+//    uint8_t charging    : 1;
+//
+//    // byte 2: left-side buttons + triggers
+//    uint8_t dpad_down   : 1;
+//    uint8_t dpad_up     : 1;
+//    uint8_t dpad_right  : 1;
+//    uint8_t dpad_left   : 1;
+//    uint8_t btn_lsr     : 1;  // Left SR (JoyCon)
+//    uint8_t btn_lsl     : 1;  // Left SL (JoyCon)
+//    uint8_t btn_l       : 1;
+//    uint8_t btn_zl      : 1;
 
     switch_analog_t left_stick;
     switch_analog_t right_stick;
