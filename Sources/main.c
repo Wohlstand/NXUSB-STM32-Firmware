@@ -21,6 +21,7 @@
 #include "usart.h"
 #include "gpio.h"
 #include "usb/usb.h"
+#include "usb/usb_extra.h"
 #include "switch/switch.h"
 #include "switch/switch_desc.h"
 #include "debug_uart.h"
@@ -34,9 +35,140 @@
 
 void SystemClock_Config(void);
 
+#define MODE_SLOW       2  // 2MHz
+#define CNF_ODOUTPUT    (1 << 2)
+#define CRH(pin, cnfmode)  ((cnfmode) << ((pin-8)*4))
+
+static void sysreset(void)
+{
+    /* Reset the RCC clock configuration to the default reset state(for debug purpose) */
+    /* Set HSION bit */
+    RCC->CR |= (uint32_t)0x00000001;
+    /* Reset SW, HPRE, PPRE1, PPRE2, ADCPRE and MCO bits */
+    RCC->CFGR &= (uint32_t)0xF8FF0000;
+    /* Reset HSEON, CSSON and PLLON bits */
+    RCC->CR &= (uint32_t)0xFEF6FFFF;
+    /* Reset HSEBYP bit */
+    RCC->CR &= (uint32_t)0xFFFBFFFF;
+    /* Reset PLLSRC, PLLXTPRE, PLLMUL and USBPRE/OTGFSPRE bits */
+    RCC->CFGR &= (uint32_t)0xFF80FFFF;
+    /* Disable all interrupts and clear pending bits  */
+    RCC->CIR = 0x009F0000;
+
+    SCB->VTOR = FLASH_BASE; /* Vector Table Relocation in Internal FLASH. */
+}
+
+
+#define  RCC_CFGR_PLLSRC_HSE                ((uint32_t)0x00010000)        /*!< HSE clock selected as PLL entry clock source */
+
+static void StartHSE()
+{
+    volatile uint32_t StartUpCounter = 0;
+
+    /* SYSCLK, HCLK, PCLK2 and PCLK1 configuration ---------------------------*/
+    /* Enable HSE */
+    RCC->CR |= ((uint32_t)RCC_CR_HSEON);
+
+    /* Wait till HSE is ready and if Time out is reached exit */
+    do
+    {
+        ++StartUpCounter;
+    } while(!(RCC->CR & RCC_CR_HSERDY) && (StartUpCounter < 10000));
+
+
+    if (RCC->CR & RCC_CR_HSERDY) // HSE started
+    {
+        /* Enable Prefetch Buffer */
+        FLASH->ACR |= FLASH_ACR_PRFTBE;
+
+        /* Flash 2 wait state */
+        FLASH->ACR &= (uint32_t)((uint32_t)~FLASH_ACR_LATENCY);
+        FLASH->ACR |= (uint32_t)FLASH_ACR_LATENCY_2;
+
+        /* HCLK = SYSCLK */
+        RCC->CFGR |= (uint32_t)RCC_CFGR_HPRE_DIV1;
+
+        /* PCLK2 = HCLK */
+        RCC->CFGR |= (uint32_t)RCC_CFGR_PPRE2_DIV1;
+
+        /* PCLK1 = HCLK */
+        RCC->CFGR |= (uint32_t)RCC_CFGR_PPRE1_DIV2;
+
+        /*  PLL configuration: PLLCLK = HSE * 9 = 72 MHz */
+        RCC->CFGR &= (uint32_t)((uint32_t)~(RCC_CFGR_PLLSRC | RCC_CFGR_PLLXTPRE |
+                                    RCC_CFGR_PLLMULL));
+        RCC->CFGR |= (uint32_t)(RCC_CFGR_PLLSRC_HSE | RCC_CFGR_PLLMULL9);
+
+        /* Enable PLL */
+        RCC->CR |= RCC_CR_PLLON;
+
+        /* Wait till PLL is ready */
+        StartUpCounter = 0;
+        while((RCC->CR & RCC_CR_PLLRDY) == 0 && ++StartUpCounter < 1000){}
+
+        /* Select PLL as system clock source */
+        RCC->CFGR &= (uint32_t)((uint32_t)~(RCC_CFGR_SW));
+        RCC->CFGR |= (uint32_t)RCC_CFGR_SW_PLL;
+
+        /* Wait till PLL is used as system clock source */
+        StartUpCounter = 0;
+        while(((RCC->CFGR & (uint32_t)RCC_CFGR_SWS) != (uint32_t)0x08) && ++StartUpCounter < 1000){}
+    }
+    else // HSE fails to start-up
+    {
+        ; // add some code here (use HSI)
+    }
+}
+
+static void hw_setup()
+{
+    // Enable clocks to the GPIO subsystems (PB for ADC), turn on AFIO clocking to disable SWD/JTAG
+    RCC->APB2ENR |= RCC_APB2ENR_IOPAEN | RCC_APB2ENR_IOPBEN | RCC_APB2ENR_IOPCEN | RCC_APB2ENR_AFIOEN;
+    // turn off SWJ/JTAG
+    //AFIO->MAPR = AFIO_MAPR_SWJ_CFG_DISABLE;
+    // turn off USB pullup
+    GPIOA->ODR = (1 << 13);
+    // Set led (PC13) as opendrain output
+    GPIOC->CRH = CRH(13, CNF_ODOUTPUT | MODE_SLOW);
+    // Set USB pullup (PA13) as opendrain output
+    GPIOA->CRH = CRH(13, CNF_ODOUTPUT | MODE_SLOW);
+}
 
 
 
+#define IWDG_REFRESH      (uint32_t)(0x0000AAAA)
+#define IWDG_WRITE_ACCESS (uint32_t)(0x00005555)
+#define IWDG_START        (uint32_t)(0x0000CCCC)
+
+static void iwdg_setup()
+{
+    uint32_t tmout = 16000000;
+    /* Enable the peripheral clock RTC */
+    /* (1) Enable the LSI (40kHz) */
+    /* (2) Wait while it is not ready */
+    RCC->CSR |= RCC_CSR_LSION; /* (1) */
+    while((RCC->CSR & RCC_CSR_LSIRDY) != RCC_CSR_LSIRDY)
+    {
+        if(--tmout == 0) break;   /* (2) */
+    }
+    /* Configure IWDG */
+    /* (1) Activate IWDG (not needed if done in option bytes) */
+    /* (2) Enable write access to IWDG registers */
+    /* (3) Set prescaler by 64 (1.6ms for each tick) */
+    /* (4) Set reload value to have a rollover each 2s */
+    /* (5) Check if flags are reset */
+    /* (6) Refresh counter */
+    IWDG->KR = IWDG_START; /* (1) */
+    IWDG->KR = IWDG_WRITE_ACCESS; /* (2) */
+    IWDG->PR = IWDG_PR_PR_1; /* (3) */
+    IWDG->RLR = 1250; /* (4) */
+    tmout = 16000000;
+    while(IWDG->SR)
+    {
+        if(--tmout == 0) break;   /* (5) */
+    }
+    IWDG->KR = IWDG_REFRESH; /* (6) */
+}
 
 // ---- UART Command Protocol ----
 #define CMD_START 0xAA
@@ -79,7 +211,7 @@ static void send_ack(void)
 // Start listening for one byte (non-blocking, interrupt-driven)
 static void uart_listen(void)
 {
-    HAL_UART_Receive_IT(&huart1, (uint8_t*)&rx_cmd.cmd, 1);
+    HAL_UART_Receive_IT(&huart1, &rx_cmd.cmd, 1);
     // sizeof(rx_cmd)
 }
 
@@ -144,7 +276,6 @@ static void uart_poll(void)
     }
 }
 
-
 int main(void)
 {
     uint32_t lastT = 0;
@@ -154,7 +285,9 @@ int main(void)
         .speed = TUSB_SPEED_FULL
     };
 
-    rx_cmd.cmd = CMD_None;
+    sysreset();
+    StartHSE();
+    hw_setup();
 
     HAL_Init();
 
@@ -165,11 +298,18 @@ int main(void)
     SysTick_Config(SystemCoreClock / 1000);
 
     MX_USART1_UART_Init();
+
+    RCC->CSR |= RCC_CSR_RMVF; // remove reset flags
+
+    USBPU_OFF();
+    USB_setup();
     MX_USB_PCD_Init();
+    USBPU_ON();
+
     debug_init(&huart1);
     debug_println("=== Auto Switch Pro boot ===");
 
-    input_state_reset();
+    init_input_state();
 
     // LED on at boot (PB2, active-low)
     HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
@@ -179,11 +319,13 @@ int main(void)
     tusb_init(BOARD_TUD_RHPORT, &dev_init);
     tud_sof_cb_enable(true);
 
+
     // Soft-reconnect: pull D+ low, wait, then re-assert.
     // The STM32H5 boots so fast that D+ goes high almost instantly after VBUS.
     // Strict USB hosts (like the Switch dock) need to see a clean transition.
     tud_disconnect();
     HAL_Delay(2000);
+    iwdg_setup();
     tud_connect();
 
     debug_println("USB connected, waiting for host...");
@@ -195,6 +337,8 @@ int main(void)
     {
         uint32_t t = HAL_GetTick();
 
+        IWDG->KR = IWDG_REFRESH; // refresh watch dog
+
         if(lastT > t || t - lastT > 499)
         {
             HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
@@ -202,7 +346,6 @@ int main(void)
         }
 
         tud_task();
-
         // Service any queued protocol responses (handshake, subcommand replies)
         switch_pro_send_queued();
 
@@ -242,7 +385,7 @@ void SystemClock_Config(void)
     oscinitstruct.PLL.PLLState    = RCC_PLL_ON;
     oscinitstruct.PLL.PLLSource   = RCC_PLLSOURCE_HSE;
 
-    if(HAL_RCC_OscConfig(&oscinitstruct)!= HAL_OK)
+    if(HAL_RCC_OscConfig(&oscinitstruct) != HAL_OK)
     {
         while(1) { ; }
     }

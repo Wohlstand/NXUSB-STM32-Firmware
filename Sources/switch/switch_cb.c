@@ -17,7 +17,7 @@
 // ---- Pro Controller protocol state ----
 switch_pro_state_t pro_state;
 
-static switch_pro_input_state input_state;
+static switch_pro_input_state_t input_state;
 
 // ---- SPI Flash Data (factory calibration / configuration) ----
 // Based on GP2040-CE and SwitchDualShockAdapter — addresses the Switch reads
@@ -272,9 +272,9 @@ static void handle_subcommand(const uint8_t *data, uint16_t len)
 
     uint8_t subcmd = data[10]; // subcommand ID is at offset 10
 
-    debug_print_begin();
-    debug_print("[01] sub="); debug_hex8(subcmd);
-    debug_print_end();
+//    debug_print_begin();
+//    debug_print("[01] sub="); debug_hex8(subcmd);
+//    debug_print_end();
 
     switch(subcmd)
     {
@@ -392,12 +392,14 @@ void switch_pro_handle_output(const uint8_t *data, uint16_t len)
     case REPORT_ID_OUTPUT_80:
         handle_config_command(sub_id);
         break;
+
     case REPORT_ID_OUTPUT_01:
         if (len >= 11)
         {
             handle_subcommand(data, len);
         }
         break;
+
     case REPORT_ID_OUTPUT_10:
         // Rumble-only packet — ignore
         break;
@@ -405,7 +407,6 @@ void switch_pro_handle_output(const uint8_t *data, uint16_t len)
         break;
     }
 }
-
 
 void input_state_reset(void)
 {
@@ -418,10 +419,16 @@ void input_state_reset(void)
     input_state.stick_r[1] = 0x7FF;
 }
 
+void init_input_state(void)
+{
+    memset(&pro_state, 0, sizeof(input_state));
+    input_state_reset();
+}
+
 // ---- TinyUSB callbacks ----
 void tud_mount_cb(void)
 {
-    debug_println("[USB] MOUNTED");
+//    debug_println("[USB] MOUNTED");
     pro_state.handshake_done = false;
     pro_state.reports_enabled = false;
     pro_state.report_counter = 0;
@@ -431,7 +438,7 @@ void tud_mount_cb(void)
 
 void tud_umount_cb(void)
 {
-    debug_println("[USB] UNMOUNTED");
+//    debug_println("[USB] UNMOUNTED");
     pro_state.handshake_done = false;
     pro_state.reports_enabled = false;
     input_state_reset();
@@ -451,6 +458,9 @@ uint16_t tud_hid_get_report_cb(uint8_t itf, uint8_t report_id,
                                 uint8_t* buffer, uint16_t reqlen)
 {
     (void)itf; (void)report_id; (void)report_type; (void)reqlen;
+
+    debug_println("[USB] tud_hid_get_report_cb");
+
     return 0;
 }
 
@@ -460,6 +470,9 @@ void tud_hid_set_report_cb(uint8_t itf, uint8_t report_id,
                             uint8_t const* buffer, uint16_t bufsize)
 {
     (void)itf; (void)report_id; (void)report_type;
+
+//    debug_println("[USB] tud_hid_set_report_cb");
+
     switch_pro_handle_output(buffer, bufsize);
 }
 
@@ -472,7 +485,7 @@ bool switch_pro_send_queued(void)
     if(!tud_hid_ready())
         return false;
 
-    debug_dump(">> OUT", pro_state.report_buf, 20);
+//    debug_dump(">> OUT", pro_state.report_buf, 20);
     tud_hid_report(queued_report_id, pro_state.report_buf, 64);
     report_queued = false;
     return true;

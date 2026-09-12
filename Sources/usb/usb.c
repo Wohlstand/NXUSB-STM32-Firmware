@@ -26,6 +26,12 @@ void MX_USB_PCD_Init(void)
 
     __HAL_RCC_USB_CLK_ENABLE();
 
+//    USB->CNTR   = 0;
+//    USB->BTABLE = 0;
+//    USB->DADDR  = 0;
+//    USB->ISTR   = 0;
+//    USB->CNTR   = USB_CNTR_RESETM | USB_CNTR_WKUPM;
+
 //    hpcd_USB_DRD_FS.Instance = USB;
 //    hpcd_USB_DRD_FS.Init.dev_endpoints = 8;
 //    hpcd_USB_DRD_FS.Init.dma_enable = 0;

@@ -143,14 +143,8 @@ typedef struct
     // Gyroscope
     uint16_t gyro[3][3];
     uint8_t  gyro_count;
-} switch_pro_input_state;
+} switch_pro_input_state_t;
 
-typedef struct __attribute__((packed))
-{
-    uint8_t connection_info : 4;
-    uint8_t battery_level   : 4;
-
-    uint8_t m_button_status[3];
 
 //    // byte 0: right-side buttons + triggers
 //    uint8_t btn_y       : 1;
@@ -181,6 +175,14 @@ typedef struct __attribute__((packed))
 //    uint8_t btn_lsl     : 1;  // Left SL (JoyCon)
 //    uint8_t btn_l       : 1;
 //    uint8_t btn_zl      : 1;
+
+
+typedef struct __attribute__((packed))
+{
+    uint8_t connection_info : 4;
+    uint8_t battery_level   : 4;
+
+    uint8_t m_button_status[3];
 
     switch_analog_t left_stick;
     switch_analog_t right_stick;

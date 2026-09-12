@@ -51,6 +51,7 @@ set(PROJECT_SOURCES
     Sources/syscalls.c
     Sources/sysmem.c
     Sources/usb/usb.c
+    Sources/usb/usb_extra.c
     Sources/usb/usb_descriptors.c
     Sources/switch/switch_cb.c
     Sources/usart.c
@@ -90,10 +91,10 @@ set(PROJECT_SOURCES
 
 set(PROJECT_DEFINES
     -DSTM32F1
-    -DSTM32F103x6
-
+    -DSTM32F103xB
+    -DSTM32F10X_MD
+    -DDEBUG
     -DHSE_VALUE=8000000U
-
     -DCFG_TUSB_MCU=OPT_MCU_STM32F1
 )
 

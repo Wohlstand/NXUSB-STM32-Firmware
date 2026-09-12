@@ -212,7 +212,7 @@ uint8_t const desc_configuration[] =
 
 uint8_t const* tud_descriptor_configuration_cb(uint8_t index)
 {
-    debug_println("[USB] Config CB");
+    debug_println("[USB] Descriptor Config CB");
     (void)index;
     return desc_configuration;
 }
