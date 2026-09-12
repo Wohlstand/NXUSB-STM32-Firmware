@@ -11,6 +11,8 @@
 #include "main.h"
 
 extern UART_HandleTypeDef huart1;
+extern DMA_HandleTypeDef hdma_tx;
+extern DMA_HandleTypeDef hdma_rx;
 
 extern void MX_USART1_UART_Init(void);
 

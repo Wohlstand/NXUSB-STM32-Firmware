@@ -459,3 +459,166 @@ bool switch_pro_send_queued(void)
     return true;
 }
 
+static uint32_t phase_start = 0;
+static uint32_t phase_status = 0;
+
+enum Phases
+{
+    PHASE_IDLE = 0,
+    PHASE_LR = 1,
+    PHASE_A,
+    PHASE_B,
+    PHASE_X,
+    PHASE_Y,
+    PHASE_DPAD_L,
+    PHASE_DPAD_R,
+    PHASE_DPAD_U,
+    PHASE_DPAD_D,
+    PHASE_L,
+    PHASE_R,
+};
+
+void switch_hit(char key)
+{
+    switch(key)
+    {
+    case '1':
+        phase_status = PHASE_A;
+        break;
+    case '2':
+        phase_status = PHASE_B;
+        break;
+    case '3':
+        phase_status = PHASE_X;
+        break;
+    case '4':
+        phase_status = PHASE_Y;
+        break;
+    case '5':
+        phase_status = PHASE_L;
+        break;
+    case '6':
+        phase_status = PHASE_R;
+        break;
+    case 'w':
+        phase_status = PHASE_DPAD_U;
+        break;
+    case 'a':
+        phase_status = PHASE_DPAD_L;
+        break;
+    case 's':
+        phase_status = PHASE_DPAD_D;
+        break;
+    case 'd':
+        phase_status = PHASE_DPAD_R;
+        break;
+    default:
+        return;
+    }
+    phase_start = 0;
+}
+
+void switch_update_state(void)
+{
+    if(!pro_state.reports_enabled)
+    {
+        phase_start = 0;
+        phase_status = PHASE_LR;
+        return;
+    }
+
+    static uint32_t last_report_ms = 0;
+    uint32_t now = HAL_GetTick();
+
+    // Send input reports every 8ms (~125 Hz)
+    if(tud_hid_ready() && (now - last_report_ms >= 8))
+    {
+        last_report_ms = now;
+
+        switch_pro_report_t report;
+        memset(&report, 0, sizeof(report));
+        report.report_id = REPORT_ID_INPUT_30;
+        report.timestamp = pro_state.report_counter++;
+
+        // Battery good, USB connection
+        report.input.battery_level = 0x08;
+        report.input.connection_info = 0x00;
+        report.input.charging = 1;
+
+        // Left stick held up-center, right stick at centre (12-bit: 0x7FF = 2047)
+        switch_analog_set_xy(&report.input.left_stick,  0x7FF, 0x7FF);
+        switch_analog_set_xy(&report.input.right_stick, 0x7FF, 0x7FF);
+
+        // Vibro-motor report
+        report.rumble_report = 0x00;
+
+        // ---- Button automation ----
+        if(phase_start == 0)
+            phase_start = now;
+
+        uint32_t elapsed = now - phase_start;
+
+        if(phase_status == PHASE_LR)
+        {
+            if(elapsed < 3000)
+            {
+                // First 3 seconds: press L+R to register on Grip/Order screen
+                report.input.btn_l = 1;
+                report.input.btn_r = 1;
+            }
+            else
+            {
+                phase_status = PHASE_IDLE;
+            }
+        }
+        else if(phase_status != PHASE_IDLE)
+        {
+            if(elapsed < 100)
+            {
+                switch(phase_status)
+                {
+                case PHASE_A:
+                    report.input.btn_a = 1;
+                    break;
+                case PHASE_B:
+                    report.input.btn_b = 1;
+                    break;
+                case PHASE_X:
+                    report.input.btn_x = 1;
+                    break;
+                case PHASE_Y:
+                    report.input.btn_y = 1;
+                    break;
+
+                case PHASE_L:
+                    report.input.btn_l = 1;
+                    break;
+                case PHASE_R:
+                    report.input.btn_r = 1;
+                    break;
+
+                case PHASE_DPAD_L:
+                    report.input.dpad_left = 1;
+                    break;
+                case PHASE_DPAD_R:
+                    report.input.dpad_right = 1;
+                    break;
+                case PHASE_DPAD_U:
+                    report.input.dpad_up = 1;
+                    break;
+                case PHASE_DPAD_D:
+                    report.input.dpad_down = 1;
+                    break;
+                default:
+                    break;
+                }
+            }
+            else
+            {
+                phase_status = PHASE_IDLE;
+            }
+        }
+
+        tud_hid_report(0, &report, sizeof(report));
+    }
+}

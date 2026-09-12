@@ -97,11 +97,42 @@ static inline void switch_set_gyroscope(uint8_t *imu, size_t sample, int16_t x, 
     analogue_int16_to_le(z, imu + sample + (sample * 12) + 6 + 4);
 }
 
+//enum NxBtButtons
+//{
+//    Y               = 0x01,
+//    X               = 0x02,
+//    B               = 0x04,
+//    A               = 0x08,
+//    JCL_SR          = 0x10,
+//    JCL_SL          = 0x20,
+//    R               = 0x40,
+//    ZR              = 0x80,
+//
+//    PLUS            = 0x01,
+//    MINUS           = 0x02,
+//    R_STICK_PRESS   = 0x04,
+//    L_STICK_PRESS   = 0x08,
+//    HOME            = 0x10,
+//    CAPTURE         = 0x20,
+//    PADDING         = 0x40,
+//    CHARGING        = 0x80,
+//
+//    DPAD_DOWN       = 0x01,
+//    DPAD_UP         = 0x02,
+//    DPAD_RIGHT      = 0x04,
+//    DPAD_LEFT       = 0x08,
+//    JCR_SR          = 0x10,
+//    JCR_SL          = 0x20,
+//    L               = 0x40,
+//    ZL              = 0x80,
+//};
 
 typedef struct __attribute__((packed))
 {
     uint8_t connection_info : 4;
     uint8_t battery_level   : 4;
+
+//    uint8_t m_button_status[3];
 
     // byte 0: right-side buttons + triggers
     uint8_t btn_y       : 1;

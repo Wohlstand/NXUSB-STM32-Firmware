@@ -156,6 +156,7 @@ _Static_assert(sizeof(desc_hid_report) == 203, "HID report descriptor must be 20
 uint8_t const* tud_hid_descriptor_report_cb(uint8_t itf)
 {
     (void)itf;
+    debug_println("[USB] HID Descriptor Report CB");
     return desc_hid_report;
 }
 

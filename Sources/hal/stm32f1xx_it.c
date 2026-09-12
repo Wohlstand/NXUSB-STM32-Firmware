@@ -21,6 +21,9 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "stm32f1xx_it.h"
+
+#include "tusb_config.h"
+#include "tusb.h"
    
 /** @addtogroup STM32F1xx_HAL_Examples
   * @{
@@ -139,12 +142,12 @@ volatile uint32_t system_ticks = 0;
   */
 void SysTick_Handler(void)
 {
-  HAL_IncTick();
-  system_ticks++;
+    HAL_IncTick();
+    system_ticks++;
 }
 
 uint32_t tusb_time_millis_api(void) {
-  return system_ticks;
+    return system_ticks;
 }
 
 /******************************************************************************/

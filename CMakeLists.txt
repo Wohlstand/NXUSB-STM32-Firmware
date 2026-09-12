@@ -50,11 +50,6 @@ set(PROJECT_SOURCES
     Sources/main.c
     Sources/syscalls.c
     Sources/sysmem.c
-    # Sources/keycodes.c
-    # Sources/usart.c
-    # Sources/usb.c
-    # Sources/usb_lib.c
-    # Sources/startup/vector.c
     Sources/usb/usb.c
     Sources/usb/usb_descriptors.c
     Sources/switch/switch_cb.c
@@ -73,7 +68,6 @@ set(PROJECT_SOURCES
     3rdparty/tinyusb/src/class/hid/hid_device.c
     3rdparty/tinyusb/src/portable/st/stm32_fsdev/fsdev_common.c
     3rdparty/tinyusb/src/portable/st/stm32_fsdev/dcd_stm32_fsdev.c
-    # 3rdparty/tinyusb/hw/bsp/stm32f1/family.c
 
     # HAL drivers
     3rdparty/hal/Src/stm32f1xx_hal.c
@@ -96,8 +90,8 @@ set(PROJECT_SOURCES
 
 set(PROJECT_DEFINES
     -DSTM32F1
-    -DSTM32F103xB
-    -DSTM32F10X_MD
+    -DSTM32F103x6
+
     -DHSE_VALUE=8000000U
 
     -DCFG_TUSB_MCU=OPT_MCU_STM32F1
@@ -109,7 +103,7 @@ set(PROJECT_INCLUDES
     Sources
     3rdparty/tinyusb/src
     3rdparty/tinyusb/hw
-    3rdparty/tinyusb/hw/bsp/stm32f1/boards/stm32f103_bluepill
+    # 3rdparty/tinyusb/hw/bsp/stm32f1/boards/stm32f103_bluepill
     3rdparty/hal/Inc
 )
 

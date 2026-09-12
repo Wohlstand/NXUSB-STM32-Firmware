@@ -1,5 +1,6 @@
 #include "debug_uart.h"
 #include <string.h>
+//#include <stdbool.h>
 
 static UART_HandleTypeDef *debug_huart = NULL;
 
@@ -9,10 +10,29 @@ void debug_init(UART_HandleTypeDef *huart)
     debug_println("\r\n--- Switch Pro Controller Debug ---");
 }
 
+//volatile bool s_print_busy = false;
+
+//void HAL_UART_TxCpltCallback(UART_HandleTypeDef *UartHandle)
+//{
+//    s_print_busy = false;
+//}
+
+extern void Error_Handler(void);
+
 void debug_print(const char *str)
 {
-    if (!debug_huart) return;
-    HAL_UART_Transmit(debug_huart, (const uint8_t *)str, (uint16_t)strlen(str), 10);
+    if (!debug_huart)
+        return;
+
+//    s_print_busy = true;
+
+    if(HAL_UART_Transmit(debug_huart, (const uint8_t *)str, (uint16_t)strlen(str), 10) != HAL_OK)
+    {
+        /* Transfer error in reception process */
+        Error_Handler();
+    }
+
+//    while(s_print_busy);
 }
 
 static const char hex_chars[] = "0123456789ABCDEF";
