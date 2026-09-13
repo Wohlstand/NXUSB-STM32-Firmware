@@ -14,7 +14,7 @@ static const char msg_tail = 0x7F;
 
 static const size_t     log_buffer_max = 1024;
 static uint16_t         log_buffer_length = 0;
-static uint8_t          log_buffer[1024 + 1];
+static uint8_t          log_buffer[1024 + 1] = {0};
 
 
 void mine_debug_print(const char *format, ...)
@@ -47,7 +47,7 @@ static void log_insert(const uint8_t *buff, uint16_t len)
 void debug_init(UART_HandleTypeDef *huart)
 {
     debug_huart = huart;
-    debug_println("\r\n--- Switch Pro Controller Debug ---");
+    debug_println("--- Switch Pro Controller Debug ---");
 }
 
 //volatile bool s_print_busy = false;
@@ -103,7 +103,8 @@ void debug_insert(const char *str)
 
 void debug_imu_state(uint8_t enabled)
 {
-    uint8_t msg[3];
+    HAL_StatusTypeDef ret;
+    static uint8_t msg[3];
 
     if(!debug_huart)
         return;
@@ -114,7 +115,9 @@ void debug_imu_state(uint8_t enabled)
 
     while(debug_huart->gState != HAL_UART_STATE_READY);
 
-    if(HAL_UART_Transmit_IT(debug_huart, msg, 3) != HAL_OK)
+    ret = HAL_UART_Transmit_IT(debug_huart, msg, sizeof(msg));
+
+    if(ret != HAL_OK)
     {
         /* Transfer error in reception process */
         Error_Handler();
@@ -123,7 +126,8 @@ void debug_imu_state(uint8_t enabled)
 
 void debug_palyer(uint8_t player)
 {
-    uint8_t msg[3];
+    HAL_StatusTypeDef ret;
+    static uint8_t msg[3];
 
     if(!debug_huart)
         return;
@@ -151,13 +155,19 @@ void debug_palyer(uint8_t player)
     case 0xF0:
         msg[1] = 4;
         break;
+
+    default:
+        msg[1] = 0;
+        break;
     }
 
     msg[2] = msg_tail;
 
     while(debug_huart->gState != HAL_UART_STATE_READY);
 
-    if(HAL_UART_Transmit_IT(debug_huart, msg, 3) != HAL_OK)
+    ret = HAL_UART_Transmit_IT(debug_huart, msg, sizeof(msg));
+
+    if(ret != HAL_OK)
     {
         /* Transfer error in reception process */
         Error_Handler();
@@ -207,6 +217,20 @@ void debug_println(const char *str)
 {
     debug_print_begin();
     debug_insert(str);
+    debug_print_end();
+}
+
+void debug_printf(const char *format, ...)
+{
+    char sub_buffer[1022];
+    va_list list;
+
+    va_start(list, format);
+    vsnprintf(sub_buffer, 1022, format, list);
+    va_end(list);
+
+    debug_print_begin();
+    debug_insert(sub_buffer);
     debug_print_end();
 }
 

@@ -12,9 +12,9 @@
 
 extern void switch_pro_handle_output(const uint8_t *data, uint16_t len);
 
-extern void input_state_reset(void);
+extern void switch_init_input_state(void);
 
-extern void init_input_state(void);
+extern void switch_input_state_reset(void);
 
 extern bool switch_pro_send_queued(void);
 

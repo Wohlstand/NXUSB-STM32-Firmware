@@ -94,8 +94,8 @@ set(PROJECT_DEFINES
     -DSTM32F103xB
     -DSTM32F10X_MD
     -DDEBUG
-    -DHSE_VALUE=8000000U
-    -DCFG_TUSB_DEBUG=2
+    # -DHSE_VALUE=8000000U
+    -DCFG_TUSB_DEBUG=0
     -DCFG_TUSB_MCU=OPT_MCU_STM32F1
     -DCFG_TUSB_DEBUG_PRINTF=mine_debug_print
 )
@@ -104,6 +104,7 @@ set(PROJECT_INCLUDES
     include/cm
     include/Fx
     Sources
+    Sources/configs
     3rdparty/tinyusb/src
     3rdparty/tinyusb/hw
     # 3rdparty/tinyusb/hw/bsp/stm32f1/boards/stm32f103_bluepill

@@ -17,6 +17,6 @@
 #define USBPU_ON()  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_13, GPIO_PIN_RESET)
 #define USBPU_OFF() HAL_GPIO_WritePin(GPIOA, GPIO_PIN_13, GPIO_PIN_SET)
 
-extern void USB_setup();
+extern void USB_init_workaround();
 
 #endif /* SOURCES_USB_EXTRA_H_ */

@@ -39,7 +39,7 @@ void SystemClock_Config(void);
 #define CNF_ODOUTPUT    (1 << 2)
 #define CRH(pin, cnfmode)  ((cnfmode) << ((pin-8)*4))
 
-static void sysreset(void)
+__attribute__((always_inline)) static inline void sysreset(void)
 {
     /* Reset the RCC clock configuration to the default reset state(for debug purpose) */
     /* Set HSION bit */
@@ -56,6 +56,67 @@ static void sysreset(void)
     RCC->CIR = 0x009F0000;
 
     SCB->VTOR = FLASH_BASE; /* Vector Table Relocation in Internal FLASH. */
+}
+
+#define  RCC_CFGR_PLLSRC_HSE                ((uint32_t)0x00010000)        /*!< HSE clock selected as PLL entry clock source */
+
+__attribute__((always_inline)) static inline void StartHSE()
+{
+    volatile uint32_t StartUpCounter = 0;
+
+    /* SYSCLK, HCLK, PCLK2 and PCLK1 configuration ---------------------------*/
+    /* Enable HSE */
+    RCC->CR |= ((uint32_t)RCC_CR_HSEON);
+
+    /* Wait till HSE is ready and if Time out is reached exit */
+    do
+    {
+        ++StartUpCounter;
+    } while(!(RCC->CR & RCC_CR_HSERDY) && (StartUpCounter < 10000));
+
+
+    if (RCC->CR & RCC_CR_HSERDY) // HSE started
+    {
+        /* Enable Prefetch Buffer */
+        FLASH->ACR |= FLASH_ACR_PRFTBE;
+
+        /* Flash 2 wait state */
+        FLASH->ACR &= (uint32_t)((uint32_t)~FLASH_ACR_LATENCY);
+        FLASH->ACR |= (uint32_t)FLASH_ACR_LATENCY_2;
+
+        /* HCLK = SYSCLK */
+        RCC->CFGR |= (uint32_t)RCC_CFGR_HPRE_DIV1;
+
+        /* PCLK2 = HCLK */
+        RCC->CFGR |= (uint32_t)RCC_CFGR_PPRE2_DIV1;
+
+        /* PCLK1 = HCLK */
+        RCC->CFGR |= (uint32_t)RCC_CFGR_PPRE1_DIV2;
+
+        /*  PLL configuration: PLLCLK = HSE * 9 = 72 MHz */
+        RCC->CFGR &= (uint32_t)((uint32_t)~(RCC_CFGR_PLLSRC | RCC_CFGR_PLLXTPRE |
+                                        RCC_CFGR_PLLMULL));
+        RCC->CFGR |= (uint32_t)(RCC_CFGR_PLLSRC_HSE | RCC_CFGR_PLLMULL9);
+
+        /* Enable PLL */
+        RCC->CR |= RCC_CR_PLLON;
+
+        /* Wait till PLL is ready */
+        StartUpCounter = 0;
+        while((RCC->CR & RCC_CR_PLLRDY) == 0 && ++StartUpCounter < 1000){}
+
+        /* Select PLL as system clock source */
+        RCC->CFGR &= (uint32_t)((uint32_t)~(RCC_CFGR_SW));
+        RCC->CFGR |= (uint32_t)RCC_CFGR_SW_PLL;
+
+        /* Wait till PLL is used as system clock source */
+        StartUpCounter = 0;
+        while(((RCC->CFGR & (uint32_t)RCC_CFGR_SWS) != (uint32_t)0x08) && ++StartUpCounter < 1000){}
+    }
+    else // HSE fails to start-up
+    {
+        ; // add some code here (use HSI)
+    }
 }
 
 static void hw_setup()
@@ -115,8 +176,8 @@ static volatile uint8_t pending_cmd = CMD_None;  // 'R', 'P', or 0 (none)
 
 static void send_ack(void)
 {
-    uint8_t ack[] = { 'K', '\n', 0x7F };
-    HAL_UART_Transmit(&huart1, ack, 3, 10);
+    static const uint8_t ack[] = { 'd', 'K', '\n', 0x7F };
+    HAL_UART_Transmit(&huart1, ack, sizeof(ack), 10);
 }
 
 // Start listening for one byte (non-blocking, interrupt-driven)
@@ -205,20 +266,26 @@ int main(void)
 {
     uint32_t lastT = 0;
 
+    // Clear memory
+    memset(&rx_cmd, 0, sizeof(rx_cmd));
+    switch_init_input_state();
+
     sysreset();
-//    StartHSE();
+    StartHSE();
 
     HAL_Init();
 
-    SysTick_Config(SystemCoreClock / 1000);
     SystemClock_Config();
 
     hw_setup();
 
     MX_GPIO_Init();
 
+    USBPU_OFF();
+
     MX_USART1_UART_Init();
 
+    SysTick_Config(SystemCoreClock / 1000);
 
     debug_init(&huart1);
 
@@ -235,25 +302,34 @@ int main(void)
     // LED on at boot (PB2, active-low)
     HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
 
-    USBPU_OFF();
-
-    HAL_Delay(100);
-
-    USB_setup();
+    USB_init_workaround();
     MX_USB_PCD_Init();
 
-    init_input_state();
+//    tud_disconnect();
+//    tusb_deinit(0);
+//    HAL_Delay(1000);
 
     tusb_init(BOARD_TUD_RHPORT, &dev_init);
+//    tud_disconnect();
     tud_sof_cb_enable(true);
-
-    tud_disconnect();
-//    HAL_Delay(500);
+//    tud_task();
+//    HAL_Delay(100);
+//    tud_task();
+//    HAL_Delay(100);
+//    tud_task();
     iwdg_setup();
-    tud_connect();
+//    tud_connect();
+//    tud_task();
 //    USBPU_ON();
 
     debug_println("USB connected, waiting for host...");
+
+    debug_printf("------------------------------------");
+    debug_printf("SYCLK= %dMHz", HAL_RCC_GetSysClockFreq() / 1000000);
+    debug_printf("HCLK = %dMHz (%u)", HAL_RCC_GetHCLKFreq() / 1000000, SystemCoreClock);
+    debug_printf("APB1 = %dMHz", HAL_RCC_GetPCLK1Freq() / 1000000);
+    debug_printf("APB2 = %dMHz", HAL_RCC_GetPCLK2Freq() / 1000000);
+    debug_printf("------------------------------------");
 
     // Start non-blocking UART receive for command protocol
     uart_listen();
@@ -301,6 +377,10 @@ void SystemClock_Config(void)
     RCC_ClkInitTypeDef clkinitstruct = {0};
     RCC_OscInitTypeDef oscinitstruct = {0};
     RCC_PeriphCLKInitTypeDef rccperiphclkinit = {0};
+
+    memset(&clkinitstruct, 0, sizeof(clkinitstruct));
+    memset(&oscinitstruct, 0, sizeof(clkinitstruct));
+    memset(&rccperiphclkinit, 0, sizeof(rccperiphclkinit));
 
     /* Enable HSE Oscillator and activate PLL with HSE as source */
     oscinitstruct.OscillatorType  = RCC_OSCILLATORTYPE_HSE;

@@ -189,11 +189,17 @@ static void fill_input_subreport(uint8_t *buf)
 // ---- Queue a response report ----
 static bool report_queued = false;
 static uint8_t queued_report_id = 0;
+static uint32_t queued_report_delayed = 0;
+static const char* queued_report_debug_id = "UNK";
+static uint32_t queued_report_last_delay = 0;
 
-static void queue_response(uint8_t report_id)
+static void queue_response(uint8_t report_id, uint32_t delay, const char *debug_id)
 {
     queued_report_id = report_id;
+    queued_report_debug_id = debug_id;
     report_queued = true;
+    queued_report_delayed = delay;
+    queued_report_last_delay = 0;
 }
 
 // ---- Handle 0x80 config commands ----
@@ -213,19 +219,19 @@ static void handle_config_command(uint8_t subcmd)
         buf[2] = 0x00;
         buf[3] = 0x03;  // Pro Controller
         memcpy(&buf[4], mac_address, 6);
-        queue_response(0);
+        queue_response(0, 0, "IDENT");
         break;
 
     case SUBCMD_80_HANDSHAKE:
         buf[0] = REPORT_ID_INPUT_81;
         buf[1] = SUBCMD_80_HANDSHAKE;
-        queue_response(0);
+        queue_response(0, 0, "HSHAKE");
         break;
 
     case SUBCMD_80_BAUD_RATE:
         buf[0] = REPORT_ID_INPUT_81;
         buf[1] = SUBCMD_80_BAUD_RATE;
-        queue_response(0);
+        queue_response(0, 0, "BAUD");
         break;
 
     case SUBCMD_80_DISABLE_USB_TIMEOUT:
@@ -235,20 +241,20 @@ static void handle_config_command(uint8_t subcmd)
         pro_state.reports_enabled = true;
         buf[0] = REPORT_ID_INPUT_30;
         buf[1] = subcmd;
-        queue_response(0);
+        queue_response(0, 0, "DISUSBTO");
         debug_println("[USB] Device is ready!");
         break;
 
     case SUBCMD_80_ENABLE_USB_TIMEOUT:
         buf[0] = REPORT_ID_INPUT_30;
         buf[1] = subcmd;
-        queue_response(0);
+        queue_response(0, 0, "ENUSBTO");
         break;
 
     default:
         buf[0] = REPORT_ID_INPUT_30;
         buf[1] = subcmd;
-        queue_response(0);
+        queue_response(0, 0, "Other");
         break;
     }
 }
@@ -376,7 +382,7 @@ static void handle_subcommand(const uint8_t *data, uint16_t len)
 
     //debug_print("  -> ACK="); debug_hex8(buf[13]);
     // debug_print(" sub="); debug_hex8(buf[14]); debug_print("\r\n");
-    queue_response(0);
+    queue_response(0, 0, "SubCMD");
 }
 
 // ---- Public: process incoming output report from Switch ----
@@ -411,7 +417,7 @@ void switch_pro_handle_output(const uint8_t *data, uint16_t len)
     }
 }
 
-void input_state_reset(void)
+void switch_input_state_reset(void)
 {
     memset(&input_state, 0, sizeof(input_state));
 
@@ -422,10 +428,10 @@ void input_state_reset(void)
     input_state.stick_r[1] = 0x7FF;
 }
 
-void init_input_state(void)
+void switch_init_input_state(void)
 {
     memset(&pro_state, 0, sizeof(input_state));
-    input_state_reset();
+    switch_input_state_reset();
 }
 
 // ---- TinyUSB callbacks ----
@@ -434,9 +440,12 @@ void tud_mount_cb(void)
 //    debug_println("[USB] MOUNTED");
     pro_state.handshake_done = false;
     pro_state.reports_enabled = false;
+    pro_state.reports_suspended = false;
     pro_state.report_counter = 0;
     report_queued = false;
-    input_state_reset();
+    debug_palyer(0);
+    debug_imu_state(0);
+    switch_input_state_reset();
 }
 
 void tud_umount_cb(void)
@@ -444,16 +453,26 @@ void tud_umount_cb(void)
 //    debug_println("[USB] UNMOUNTED");
     pro_state.handshake_done = false;
     pro_state.reports_enabled = false;
-    input_state_reset();
+    pro_state.reports_suspended = false;
+    debug_palyer(0);
+    debug_imu_state(0);
+    switch_input_state_reset();
 }
 
 void tud_suspend_cb(bool remote_wakeup_en)
 {
     (void)remote_wakeup_en;
+    debug_println("[USB] Suspend");
+    pro_state.reports_suspended = true;
+    debug_palyer(0);
+    debug_imu_state(0);
 }
 
 void tud_resume_cb(void)
-{}
+{
+    debug_println("[USB] Resume");
+    pro_state.reports_suspended = false;
+}
 
 void dcd_disconnect(uint8_t rhport)
 {
@@ -467,6 +486,14 @@ void dcd_connect(uint8_t rhport)
     (void)rhport;
     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_13, GPIO_PIN_RESET);
     debug_println("[USB] Soft-Connect");
+}
+
+void tud_hid_report_complete_cb(uint8_t instance, uint8_t const *report, uint16_t len)
+{
+    (void)instance;
+    (void)report;
+    (void)len;
+//    debug_println("[USB] Complete Report Request");
 }
 
 // GET_REPORT — return empty/neutral
@@ -499,15 +526,28 @@ bool switch_pro_send_queued(void)
     if(!report_queued)
         return false;
 
-    if(!tud_hid_ready())
+    if(queued_report_delayed > 0)
     {
-        debug_println("No, HID is not ready!");
-        return false;
+        int32_t now = HAL_GetTick();
+
+        if(queued_report_last_delay == 0)
+            queued_report_last_delay = now;
+
+        if(now - queued_report_last_delay < queued_report_delayed)
+            return false;
+
+        queued_report_last_delay = 0;
+        queued_report_delayed = 0;
     }
+
+    if(!tud_hid_ready())
+        return false;
 
     debug_print_begin();
     debug_insert("[USB] Queued ReportID=");
     debug_hex8(queued_report_id);
+    debug_insert(" type ");
+    debug_insert(queued_report_debug_id);
     debug_print_end();
     debug_dump(">> OUT", pro_state.report_buf, 20);
 
@@ -542,7 +582,7 @@ void switch_receive(const struct NXSendCmd *in)
 
 void switch_update_state(void)
 {
-    if(!pro_state.reports_enabled)
+    if(!pro_state.reports_enabled || pro_state.reports_suspended)
         return;
 
     static uint32_t last_report_ms = 0;

@@ -11,7 +11,7 @@
 #include "debug_uart.h"
 
 
-PCD_HandleTypeDef hpcd_USB_DRD_FS;
+//PCD_HandleTypeDef hpcd_USB_DRD_FS;
 
 /* USB init function */
 
@@ -63,71 +63,71 @@ void MX_USB_PCD_Init(void)
 //    NVIC_EnableIRQ(USB_HP_CAN1_TX_IRQn);
 }
 
-
-void HAL_PCD_MspInit(PCD_HandleTypeDef* pcdHandle)
-{
-//    GPIO_InitTypeDef GPIO_InitStruct = {0};
-//    RCC_PeriphCLKInitTypeDef PeriphClkInitStruct = {0};
-
-//    if(pcdHandle->Instance == USB)
-//    {
-//        __HAL_RCC_GPIOA_CLK_ENABLE();
-//        GPIO_InitStruct.Pin = (GPIO_PIN_11 | GPIO_PIN_12);
-//        GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-//        GPIO_InitStruct.Pull = GPIO_NOPULL;
-//        GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-//        HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
-        /* Set USB Interrupt priority */
-//        NVIC_SetPriority(USB_LP_CAN1_RX0_IRQn, 15);
-//        NVIC_SetPriority(USB_HP_CAN1_TX_IRQn, 15);
-//        NVIC_SetPriority(USBWakeUp_IRQn, 15);
-
-        /* Enable USB Interrupt */
-//        HAL_NVIC_EnableIRQ(USB_LP_CAN1_RX0_IRQn);
-//        HAL_NVIC_EnableIRQ(USB_HP_CAN1_TX_IRQn);
-//        HAL_NVIC_EnableIRQ(USBWakeUp_IRQn);
-
-//        __HAL_RCC_USB_CLK_ENABLE();
-//    }
-}
-
-void HAL_PCD_MspDeInit(PCD_HandleTypeDef* pcdHandle)
-{
-//    if(pcdHandle->Instance == USB)
-//    {
-//        /* Peripheral clock disable */
-//        __HAL_RCC_USB_CLK_DISABLE();
-////        /**USB GPIO Configuration
-////        PA8     ------> USB_SOF
-////        PA11     ------> USB_DM
-////        PA12     ------> USB_DP
-////        */
-////        HAL_GPIO_DeInit(GPIOA, GPIO_PIN_8|GPIO_PIN_11|GPIO_PIN_12);
 //
-//        /* USB_DRD_FS interrupt Deinit */
-//        HAL_NVIC_DisableIRQ(USB_LP_CAN1_RX0_IRQn);
-//        HAL_NVIC_DisableIRQ(USB_HP_CAN1_TX_IRQn);
-//    }
-}
-
-static uint8_t init_mode = 0;
-
-//// USB status & its address
-//typedef struct
+//void HAL_PCD_MspInit(PCD_HandleTypeDef* pcdHandle)
 //{
-//    uint8_t  USB_Status;
-//    uint16_t USB_Addr;
-//} usb_dev_t;
+////    GPIO_InitTypeDef GPIO_InitStruct = {0};
+////    RCC_PeriphCLKInitTypeDef PeriphClkInitStruct = {0};
 //
-//ep_t endpoints[];
-//usb_dev_t USB_Dev;
-//uint8_t usbON = 0;
-
-void usb_SetInitMode(uint8_t init)
-{
-    init_mode = init;
-}
+////    if(pcdHandle->Instance == USB)
+////    {
+////        __HAL_RCC_GPIOA_CLK_ENABLE();
+////        GPIO_InitStruct.Pin = (GPIO_PIN_11 | GPIO_PIN_12);
+////        GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+////        GPIO_InitStruct.Pull = GPIO_NOPULL;
+////        GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+////        HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+//
+//        /* Set USB Interrupt priority */
+////        NVIC_SetPriority(USB_LP_CAN1_RX0_IRQn, 15);
+////        NVIC_SetPriority(USB_HP_CAN1_TX_IRQn, 15);
+////        NVIC_SetPriority(USBWakeUp_IRQn, 15);
+//
+//        /* Enable USB Interrupt */
+////        HAL_NVIC_EnableIRQ(USB_LP_CAN1_RX0_IRQn);
+////        HAL_NVIC_EnableIRQ(USB_HP_CAN1_TX_IRQn);
+////        HAL_NVIC_EnableIRQ(USBWakeUp_IRQn);
+//
+////        __HAL_RCC_USB_CLK_ENABLE();
+////    }
+//}
+//
+//void HAL_PCD_MspDeInit(PCD_HandleTypeDef* pcdHandle)
+//{
+////    if(pcdHandle->Instance == USB)
+////    {
+////        /* Peripheral clock disable */
+////        __HAL_RCC_USB_CLK_DISABLE();
+//////        /**USB GPIO Configuration
+//////        PA8     ------> USB_SOF
+//////        PA11     ------> USB_DM
+//////        PA12     ------> USB_DP
+//////        */
+//////        HAL_GPIO_DeInit(GPIOA, GPIO_PIN_8|GPIO_PIN_11|GPIO_PIN_12);
+////
+////        /* USB_DRD_FS interrupt Deinit */
+////        HAL_NVIC_DisableIRQ(USB_LP_CAN1_RX0_IRQn);
+////        HAL_NVIC_DisableIRQ(USB_HP_CAN1_TX_IRQn);
+////    }
+//}
+//
+//static uint8_t init_mode = 0;
+//
+////// USB status & its address
+////typedef struct
+////{
+////    uint8_t  USB_Status;
+////    uint16_t USB_Addr;
+////} usb_dev_t;
+////
+////ep_t endpoints[];
+////usb_dev_t USB_Dev;
+////uint8_t usbON = 0;
+//
+//void usb_SetInitMode(uint8_t init)
+//{
+//    init_mode = init;
+//}
 //
 //static volatile uint8_t tx_succesfull = 1;
 //

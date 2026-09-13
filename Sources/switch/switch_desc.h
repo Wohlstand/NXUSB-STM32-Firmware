@@ -204,6 +204,7 @@ typedef struct
 {
     bool     handshake_done;        // 0x80 handshake complete
     bool     reports_enabled;       // Switch asked for input reports
+    bool     reports_suspended;
     bool     imu_enabled;           // Enable sending of the IMU data
     uint8_t  imu_data_input[36];    // Input IMU samples, gets copied into report when imu is enabled
     uint8_t  report_counter;        // incrementing time stamp for 0x30

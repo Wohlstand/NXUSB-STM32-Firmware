@@ -28,6 +28,8 @@ extern void debug_hex32(uint32_t val);
 // Print string + newline
 extern void debug_println(const char *str);
 
+extern void debug_printf(const char *format, ...);
+
 // Print a buffer as hex dump (up to 64 bytes)
 extern void debug_dump(const char *label, const uint8_t *data, uint8_t len);
 
