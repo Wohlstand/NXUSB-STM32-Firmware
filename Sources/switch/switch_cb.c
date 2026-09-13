@@ -448,6 +448,16 @@ void tud_mount_cb(void)
     switch_input_state_reset();
 }
 
+void switch_query_player(void)
+{
+    debug_palyer(pro_state.player_id);
+}
+
+void switch_query_imu(void)
+{
+    debug_imu_state(pro_state.imu_enabled);
+}
+
 void tud_umount_cb(void)
 {
 //    debug_println("[USB] UNMOUNTED");
@@ -570,8 +580,17 @@ void switch_receive(const struct NXSendCmd *in)
         break;
 
     case CMD_Tilt:
-        memcpy(input_state.accel[0], in->data.tilt.accel, sizeof(uint16_t) * 3);
-        memcpy(input_state.gyro[0], in->data.tilt.gyro, sizeof(uint16_t) * 3);
+        memcpy(input_state.accel, in->data.tilt.accel, sizeof(int16_t) * 3);
+        memcpy(input_state.gyro, in->data.tilt.gyro, sizeof(int16_t) * 3);
+
+        switch_set_accelerometer(pro_state.imu_data_input, 0, input_state.accel[0], input_state.accel[1], input_state.accel[2]);
+        switch_set_accelerometer(pro_state.imu_data_input, 1, input_state.accel[0], input_state.accel[1], input_state.accel[2]);
+        switch_set_accelerometer(pro_state.imu_data_input, 2, input_state.accel[0], input_state.accel[1], input_state.accel[2]);
+
+        switch_set_gyroscope(pro_state.imu_data_input, 0, input_state.gyro[0], input_state.gyro[1], input_state.gyro[2]);
+        switch_set_gyroscope(pro_state.imu_data_input, 1, input_state.gyro[0], input_state.gyro[1], input_state.gyro[2]);
+        switch_set_gyroscope(pro_state.imu_data_input, 2, input_state.gyro[0], input_state.gyro[1], input_state.gyro[2]);
+
         break;
 
     default:
@@ -605,6 +624,9 @@ void switch_update_state(void)
 
         switch_analog_set_xy(&report.input.left_stick,  input_state.stick_l[0], input_state.stick_l[1]);
         switch_analog_set_xy(&report.input.right_stick, input_state.stick_r[0], input_state.stick_r[1]);
+
+        if(pro_state.imu_enabled)
+            memcpy(report.imu_data, pro_state.imu_data_input, sizeof(report.imu_data));
 
         // Vibro-motor report
         report.rumble_report = 0x00;

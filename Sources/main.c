@@ -196,7 +196,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 
     if(!got_data)
     {
-        if(rx_cmd.cmd != CMD_None && rx_cmd.cmd <= CMD_Reset)
+        if(rx_cmd.cmd != CMD_None && rx_cmd.cmd < CMD_END)
         {
             got_data = 1;
             HAL_UART_Receive_IT(&huart1, (uint8_t*)&rx_cmd.data, sizeof(rx_cmd) - 1);
@@ -251,8 +251,19 @@ static void uart_poll(void)
         debug_println("[CMD] PING");
         break;
 
+    case CMD_QueryPlayer:
+        debug_println("[CMD] Query Player");
+        switch_query_player();
+        break;
+
+    case CMD_QueryIMU:
+        debug_println("[CMD] Query IMU");
+        switch_query_imu();
+        break;
+
     case CMD_ButtonsUpdate:
-        debug_println("[CMD] Update buttons");
+    case CMD_Tilt:
+//        debug_println("[CMD] Update buttons"); // Floods too much@
         switch_receive(&rx_cmd);
         break;
 

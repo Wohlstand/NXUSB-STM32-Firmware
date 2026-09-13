@@ -77,14 +77,23 @@ static inline void switch_analog_set_xy(switch_analog_t *a, uint16_t x, uint16_t
     a->data[2] = (uint8_t)((y >> 4) & 0xFF);
 }
 
+// 14  15  16  17  18  19  // 0
+// 20  21  22  23  24  25  // 6, 12
+
+// 26  27  28  29  30  31  // 12
+// 32  33  34  35  36  37  // 18, 24
+
+// 38  39  40  41  42  43  // 24
+// 44  45  46  47  48  49  // 28, 36
+
 static inline void switch_set_accelerometer(uint8_t *imu, size_t sample, int16_t x, int16_t y, int16_t z)
 {
     if(sample > 2)
         return;
 
-    analogue_int16_to_le(x, imu + sample + (sample * 12));
-    analogue_int16_to_le(y, imu + sample + (sample * 12) + 2);
-    analogue_int16_to_le(z, imu + sample + (sample * 12) + 4);
+    analogue_int16_to_le(x, imu + (sample * 12));
+    analogue_int16_to_le(y, imu + (sample * 12) + 2);
+    analogue_int16_to_le(z, imu + (sample * 12) + 4);
 }
 
 static inline void switch_set_gyroscope(uint8_t *imu, size_t sample, int16_t x, int16_t y, int16_t z)
@@ -92,9 +101,9 @@ static inline void switch_set_gyroscope(uint8_t *imu, size_t sample, int16_t x, 
     if(sample > 2)
         return;
 
-    analogue_int16_to_le(x, imu + sample + (sample * 12) + 6);
-    analogue_int16_to_le(y, imu + sample + (sample * 12) + 6 + 2);
-    analogue_int16_to_le(z, imu + sample + (sample * 12) + 6 + 4);
+    analogue_int16_to_le(x, imu + (sample * 12) + 6);
+    analogue_int16_to_le(y, imu + (sample * 12) + 6 + 2);
+    analogue_int16_to_le(z, imu + (sample * 12) + 6 + 4);
 }
 
 enum NxBtButtons
@@ -137,11 +146,11 @@ typedef struct
     uint16_t stick_r[2];
 
     // Accelerometer
-    uint16_t accel[3][3];
+    int16_t  accel[3];
     uint8_t  accel_count;
 
     // Gyroscope
-    uint16_t gyro[3][3];
+    int16_t  gyro[3];
     uint8_t  gyro_count;
 } switch_pro_input_state_t;
 

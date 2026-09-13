@@ -12,8 +12,6 @@
 
 void Error_Handler(void);
 
-//#define user_button_Pin GPIO_PIN_13
-//#define user_button_GPIO_Port GPIOC
 #define LED_Pin GPIO_PIN_13
 #define LED_GPIO_Port GPIOC
 

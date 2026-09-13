@@ -16,6 +16,9 @@ extern void switch_init_input_state(void);
 
 extern void switch_input_state_reset(void);
 
+extern void switch_query_player(void);
+extern void switch_query_imu(void);
+
 extern bool switch_pro_send_queued(void);
 
 enum NXCommand
@@ -25,6 +28,10 @@ enum NXCommand
     CMD_Tilt = 2,
     CMD_Ping = 3,
     CMD_Reset = 4,
+    CMD_QueryPlayer = 5,
+    CMD_QueryIMU = 6,
+
+    CMD_END
 };
 
 struct __attribute__((packed)) NXSendCmd
@@ -44,8 +51,8 @@ struct __attribute__((packed)) NXSendCmd
         // Accelerometer / Gyroscope X, Y, Z, 3 samples
         struct Tilt
         {
-            uint16_t accel[3];
-            uint16_t gyro[3];
+            int16_t accel[3];
+            int16_t gyro[3];
         } tilt;
 
         struct Padding

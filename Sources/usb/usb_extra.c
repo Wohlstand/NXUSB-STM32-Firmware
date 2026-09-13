@@ -7,7 +7,6 @@
 
 #include <string.h>
 #include "usb.h"
-//#include "usb_defs.h"
 #include "usb_extra.h"
 
 #define USB_EPnR_STAT_TX_1      0x00000020
@@ -15,15 +14,15 @@
 #define USB_EPnR_EA             0x0000000F
 #define USB_EPnR_CTR_TX         0x00000080
 #define USB_EPnR_CTR_RX         0x00008000
-#define EP_TYPE_INTERRUPT               0x03
-#define EP_TYPE_CONTROL                 0x01
+#define EP_TYPE_INTERRUPT       0x03
+#define EP_TYPE_CONTROL         0x01
 #define USB_BTABLE_BASE         0x40006000
 #define USB_BTABLE              ((USB_BtableDef *)(USB_BTABLE_BASE))
 
 #define STM32ENDPOINTS          8
 #define ENDPOINTS_NUM           2
 #define USB_BTABLE_SIZE         512
-#define LASTADDR_DEFAULT                (STM32ENDPOINTS * 8)
+#define LASTADDR_DEFAULT        (STM32ENDPOINTS * 8)
 
 typedef struct
 {
