@@ -6,8 +6,7 @@
 // Initialize after MX_USART1_UART_Init() has been called
 extern void debug_init(UART_HandleTypeDef *huart);
 
-// Print a string (blocking, for debug only)
-extern void debug_print(const char *str);
+extern void debug_insert(const char *str);
 
 extern void debug_print_begin(void);
 extern void debug_print_end(void);

@@ -25,25 +25,17 @@ void USB_setup()
     NVIC_DisableIRQ(USB_HP_CAN1_TX_IRQn);
 
     RCC->APB1ENR |= RCC_APB1ENR_USBEN;
-    USB->CNTR   = USB_CNTR_FRES; // Force USB Reset
+    USB->CNTR   = USB_CNTR_FRES | USB_CNTR_PDWN; // Force USB Reset
 
-    for(uint32_t ctr = 0; ctr < 72000; ++ctr)
+    for(uint32_t ctr = 0; ctr < SystemCoreClock / 1000; ++ctr)
         __NOP(); // wait >1ms
 
     USB->CNTR   = 0;
     USB->BTABLE = 0;
     USB->DADDR  = 0;
     USB->ISTR   = 0;
-    USB->CNTR   = USB_CNTR_RESETM | USB_CNTR_WKUPM; // allow only wakeup & reset interrupts
-    NVIC_EnableIRQ(USB_LP_CAN1_RX0_IRQn);
-    NVIC_EnableIRQ(USB_HP_CAN1_TX_IRQn);
-
-//    USB->CNTR = USB_CNTR_RESETM | USB_CNTR_CTRM | USB_CNTR_SUSPM | USB_CNTR_WKUPM;
-    // clear address, leave only enable bit
-//    USB->DADDR = USB_DADDR_EF;
-//    USB->ISTR = ~((uint16_t)0x0400);
-
-//    USB->EP1R = (EP_TYPE_INTERRUPT << 9) | (1 & USB_EPnR_EA);
-//    USB->EP1R ^= USB_EPnR_STAT_RX | USB_EPnR_STAT_TX_1;
-//    USB->EP1R = 0;
+    USB->CNTR   = USB_CNTR_RESETM | USB_CNTR_WKUPM | USB_CNTR_ESOFM | USB_CNTR_CTRM;
+//    usb_SetInitMode(1);
+//    NVIC_EnableIRQ(USB_LP_CAN1_RX0_IRQn);
+//    NVIC_EnableIRQ(USB_HP_CAN1_TX_IRQn);
 }

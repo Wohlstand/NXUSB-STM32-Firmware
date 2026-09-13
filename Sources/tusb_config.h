@@ -23,7 +23,8 @@ extern "C" {
 #define CFG_TUSB_OS    OPT_OS_NONE
 
 // ---- Debug ----
-#define CFG_TUSB_DEBUG 0
+//#define CFG_TUSB_DEBUG 1
+//#define CFG_TUSB_DEBUG_PRINTF mine_debug_print
 
 // ---- Endpoint0 max packet size (must be 64 for Switch) ----
 #define CFG_TUD_ENDPOINT0_SIZE  64

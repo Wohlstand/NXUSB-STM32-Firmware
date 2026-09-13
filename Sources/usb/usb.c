@@ -111,11 +111,110 @@ void HAL_PCD_MspDeInit(PCD_HandleTypeDef* pcdHandle)
 //    }
 }
 
+static uint8_t init_mode = 0;
+
+//// USB status & its address
+//typedef struct
+//{
+//    uint8_t  USB_Status;
+//    uint16_t USB_Addr;
+//} usb_dev_t;
+//
+//ep_t endpoints[];
+//usb_dev_t USB_Dev;
+//uint8_t usbON = 0;
+
+void usb_SetInitMode(uint8_t init)
+{
+    init_mode = init;
+}
+//
+//static volatile uint8_t tx_succesfull = 1;
+//
+//#define EP0DATABUF_SIZE                 (64)
+//#define LASTADDR_DEFAULT                (STM32ENDPOINTS * 8)
+//
+//#define STM32ENDPOINTS          8
+//#define USB_BTABLE_SIZE         512
+//
+//// keep all DTOGs and STATs
+//#define KEEP_DTOG_STAT(EPnR)            (EPnR & ~(USB_EPnR_STAT_RX|USB_EPnR_STAT_TX|USB_EPnR_DTOG_RX|USB_EPnR_DTOG_TX))
+//#define KEEP_DTOG(EPnR)                 (EPnR & ~(USB_EPnR_DTOG_RX|USB_EPnR_DTOG_TX))
+//
+//// interrupt IN handler
+//static void EP1_Handler()
+//{
+//    uint16_t epstatus = KEEP_DTOG(USB->EP1R);
+//
+//    if(RX_FLAG(epstatus)) epstatus = (epstatus & ~USB_EPnR_STAT_TX) ^ USB_EPnR_STAT_RX; // set valid RX
+//    else
+//    {
+//        tx_succesfull = 1;
+//        epstatus = epstatus & ~(USB_EPnR_STAT_TX | USB_EPnR_STAT_RX);
+//    }
+//    // clear CTR
+//    epstatus = (epstatus & ~(USB_EPnR_CTR_RX | USB_EPnR_CTR_TX));
+//    USB->EP1R = epstatus;
+//}
+//
+//
+//int EP_Init(uint8_t number, uint8_t type, uint16_t txsz, uint16_t rxsz, void (*func)())
+//{
+//    if(number >= STM32ENDPOINTS) return 4; // out of configured amount
+//    if(txsz > USB_BTABLE_SIZE || rxsz > USB_BTABLE_SIZE) return 1; // buffer too large
+//    if(lastaddr + txsz + rxsz >= USB_BTABLE_SIZE) return 2; // out of btable
+//    USB->EPnR[number] = (type << 9) | (number & USB_EPnR_EA);
+//    USB->EPnR[number] ^= USB_EPnR_STAT_RX | USB_EPnR_STAT_TX_1;
+//    if(rxsz & 1 || rxsz > 512) return 3; // wrong rx buffer size
+//    uint16_t countrx = 0;
+//    if(rxsz < 64) countrx = rxsz / 2;
+//    else
+//    {
+//        if(rxsz & 0x1f) return 3; // should be multiple of 32
+//        countrx = 31 + rxsz / 32;
+//    }
+//    USB_BTABLE->EP[number].USB_ADDR_TX = lastaddr;
+//    endpoints[number].tx_buf = (uint16_t *)(USB_BTABLE_BASE + lastaddr * 2);
+//    endpoints[number].txbufsz = txsz;
+//    lastaddr += txsz;
+//    USB_BTABLE->EP[number].USB_COUNT_TX = 0;
+//    USB_BTABLE->EP[number].USB_ADDR_RX = lastaddr;
+//    endpoints[number].rx_buf = (uint16_t *)(USB_BTABLE_BASE + lastaddr * 2);
+//    lastaddr += rxsz;
+//    USB_BTABLE->EP[number].USB_COUNT_RX = countrx << 10;
+//    endpoints[number].func = func;
+//    return 0;
+//}
+
 /**
   * @brief This function handles USB FS global interrupt.
   */
 void USB_LP_CAN_RX0_IRQHandler(void)
 {
+    // Catch events by ourself
+//    if(init_mode)
+//    {
+//        if(USB->ISTR & USB_ISTR_RESET)
+//        {
+//            usbON = 0;
+//            debug_println("USB RESET");
+//            USB->CNTR = USB_CNTR_RESETM | USB_CNTR_CTRM | USB_CNTR_SUSPM | USB_CNTR_WKUPM;
+//            // Endpoint 0 - CONTROL
+//            // ON USB LS size of EP0 may be 8 bytes, but on FS it should be 64 bytes!
+//            lastaddr = LASTADDR_DEFAULT;
+//            // clear address, leave only enable bit
+//            USB->DADDR = USB_DADDR_EF;
+//            // state is default - wait for enumeration
+////            USB_Dev.USB_Status = USB_STATE_DEFAULT;
+//            USB->ISTR = ~USB_ISTR_RESET;
+//
+//            if(EP_Init(0, EP_TYPE_CONTROL, USB_EP0_BUFSZ, USB_EP0_BUFSZ, EP0_Handler))
+//                return;
+//        }
+//
+//        return;
+//    }
+
     tud_int_handler(0);
 }
 

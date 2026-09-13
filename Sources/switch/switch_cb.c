@@ -236,6 +236,7 @@ static void handle_config_command(uint8_t subcmd)
         buf[0] = REPORT_ID_INPUT_30;
         buf[1] = subcmd;
         queue_response(0);
+        debug_println("[USB] Device is ready!");
         break;
 
     case SUBCMD_80_ENABLE_USB_TIMEOUT:
@@ -272,9 +273,9 @@ static void handle_subcommand(const uint8_t *data, uint16_t len)
 
     uint8_t subcmd = data[10]; // subcommand ID is at offset 10
 
-//    debug_print_begin();
-//    debug_print("[01] sub="); debug_hex8(subcmd);
-//    debug_print_end();
+    debug_print_begin();
+    debug_insert("[01] sub="); debug_hex8(subcmd);
+    debug_print_end();
 
     switch(subcmd)
     {
@@ -304,7 +305,9 @@ static void handle_subcommand(const uint8_t *data, uint16_t len)
         uint32_t addr = (uint32_t)data[11] | ((uint32_t)data[12] << 8) |
                         ((uint32_t)data[13] << 16) | ((uint32_t)data[14] << 24);
         uint8_t size = data[15];
+        // debug_print_begin();
         // debug_print("[SPI] addr="); debug_hex32(addr); debug_print(" sz="); debug_hex8(size); debug_print("\r\n");
+        // debug_print_end();
 
         buf[13] = 0x90;
         buf[14] = subcmd;
@@ -452,6 +455,20 @@ void tud_suspend_cb(bool remote_wakeup_en)
 void tud_resume_cb(void)
 {}
 
+void dcd_disconnect(uint8_t rhport)
+{
+    (void)rhport;
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_13, GPIO_PIN_SET);
+    debug_println("[USB] Soft-Disconnect");
+}
+
+void dcd_connect(uint8_t rhport)
+{
+    (void)rhport;
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_13, GPIO_PIN_RESET);
+    debug_println("[USB] Soft-Connect");
+}
+
 // GET_REPORT — return empty/neutral
 uint16_t tud_hid_get_report_cb(uint8_t itf, uint8_t report_id,
                                 hid_report_type_t report_type,
@@ -483,10 +500,19 @@ bool switch_pro_send_queued(void)
         return false;
 
     if(!tud_hid_ready())
+    {
+        debug_println("No, HID is not ready!");
         return false;
+    }
 
-//    debug_dump(">> OUT", pro_state.report_buf, 20);
+    debug_print_begin();
+    debug_insert("[USB] Queued ReportID=");
+    debug_hex8(queued_report_id);
+    debug_print_end();
+    debug_dump(">> OUT", pro_state.report_buf, 20);
+
     tud_hid_report(queued_report_id, pro_state.report_buf, 64);
+
     report_queued = false;
     return true;
 }

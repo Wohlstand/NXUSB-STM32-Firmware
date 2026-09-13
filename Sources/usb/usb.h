@@ -14,4 +14,6 @@ extern PCD_HandleTypeDef hpcd_USB_DRD_FS;
 
 extern void MX_USB_PCD_Init(void);
 
+extern void usb_SetInitMode(uint8_t init);
+
 #endif /* SOURCES_USB_USB_H_ */

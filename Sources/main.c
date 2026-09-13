@@ -58,68 +58,6 @@ static void sysreset(void)
     SCB->VTOR = FLASH_BASE; /* Vector Table Relocation in Internal FLASH. */
 }
 
-
-#define  RCC_CFGR_PLLSRC_HSE                ((uint32_t)0x00010000)        /*!< HSE clock selected as PLL entry clock source */
-
-static void StartHSE()
-{
-    volatile uint32_t StartUpCounter = 0;
-
-    /* SYSCLK, HCLK, PCLK2 and PCLK1 configuration ---------------------------*/
-    /* Enable HSE */
-    RCC->CR |= ((uint32_t)RCC_CR_HSEON);
-
-    /* Wait till HSE is ready and if Time out is reached exit */
-    do
-    {
-        ++StartUpCounter;
-    } while(!(RCC->CR & RCC_CR_HSERDY) && (StartUpCounter < 10000));
-
-
-    if (RCC->CR & RCC_CR_HSERDY) // HSE started
-    {
-        /* Enable Prefetch Buffer */
-        FLASH->ACR |= FLASH_ACR_PRFTBE;
-
-        /* Flash 2 wait state */
-        FLASH->ACR &= (uint32_t)((uint32_t)~FLASH_ACR_LATENCY);
-        FLASH->ACR |= (uint32_t)FLASH_ACR_LATENCY_2;
-
-        /* HCLK = SYSCLK */
-        RCC->CFGR |= (uint32_t)RCC_CFGR_HPRE_DIV1;
-
-        /* PCLK2 = HCLK */
-        RCC->CFGR |= (uint32_t)RCC_CFGR_PPRE2_DIV1;
-
-        /* PCLK1 = HCLK */
-        RCC->CFGR |= (uint32_t)RCC_CFGR_PPRE1_DIV2;
-
-        /*  PLL configuration: PLLCLK = HSE * 9 = 72 MHz */
-        RCC->CFGR &= (uint32_t)((uint32_t)~(RCC_CFGR_PLLSRC | RCC_CFGR_PLLXTPRE |
-                                    RCC_CFGR_PLLMULL));
-        RCC->CFGR |= (uint32_t)(RCC_CFGR_PLLSRC_HSE | RCC_CFGR_PLLMULL9);
-
-        /* Enable PLL */
-        RCC->CR |= RCC_CR_PLLON;
-
-        /* Wait till PLL is ready */
-        StartUpCounter = 0;
-        while((RCC->CR & RCC_CR_PLLRDY) == 0 && ++StartUpCounter < 1000){}
-
-        /* Select PLL as system clock source */
-        RCC->CFGR &= (uint32_t)((uint32_t)~(RCC_CFGR_SW));
-        RCC->CFGR |= (uint32_t)RCC_CFGR_SW_PLL;
-
-        /* Wait till PLL is used as system clock source */
-        StartUpCounter = 0;
-        while(((RCC->CFGR & (uint32_t)RCC_CFGR_SWS) != (uint32_t)0x08) && ++StartUpCounter < 1000){}
-    }
-    else // HSE fails to start-up
-    {
-        ; // add some code here (use HSI)
-    }
-}
-
 static void hw_setup()
 {
     // Enable clocks to the GPIO subsystems (PB for ADC), turn on AFIO clocking to disable SWD/JTAG
@@ -170,41 +108,14 @@ static void iwdg_setup()
     IWDG->KR = IWDG_REFRESH; /* (6) */
 }
 
-// ---- UART Command Protocol ----
-#define CMD_START 0xAA
-
 static struct NXSendCmd rx_cmd;
 
 // Command received from ISR, processed in main loop
 static volatile uint8_t pending_cmd = CMD_None;  // 'R', 'P', or 0 (none)
 
-// Reset macro state: buttons for 500ms, then idle for 1500ms, then resume A
-static volatile bool     reset_active = false;
-static volatile uint32_t reset_start_ms = 0;
-#define RESET_ABXY_MS   500   // hold all buttons (title screen reset)
-static volatile uint32_t reset_pause_ms = 2000;  // randomised 2000-4000ms each reset
-
-// Lightweight xorshift32 PRNG for randomising A-press intervals
-static uint32_t rng_state = 1;
-static uint32_t xorshift32(void)
-{
-    uint32_t x = rng_state;
-    x ^= x << 13;
-    x ^= x >> 17;
-    x ^= x << 5;
-    rng_state = x;
-    return x;
-}
-
-// Returns a random value in [min, max] inclusive
-static uint32_t rand_range(uint32_t min, uint32_t max)
-{
-    return min + (xorshift32() % (max - min + 1));
-}
-
 static void send_ack(void)
 {
-    uint8_t ack[] = { CMD_START, 'K', '\n' };
+    uint8_t ack[] = { 'K', '\n', 0x7F };
     HAL_UART_Transmit(&huart1, ack, 3, 10);
 }
 
@@ -240,6 +151,12 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
     }
 }
 
+static const tusb_rhport_init_t dev_init =
+{
+    .role = TUSB_ROLE_DEVICE,
+    .speed = TUSB_SPEED_FULL
+};
+
 // Process pending commands in main loop (debug prints + ACK)
 static void uart_poll(void)
 {
@@ -253,11 +170,19 @@ static void uart_poll(void)
     switch(cmd)
     {
     case CMD_Reset:
-        reset_active = true;
-        reset_start_ms = HAL_GetTick();
-        reset_pause_ms = rand_range(2000, 4000);
         send_ack();
         debug_println("[CMD] RESET");
+        tud_disconnect();
+        tusb_deinit(0);
+        HAL_Delay(100);
+        tusb_init(BOARD_TUD_RHPORT, &dev_init);
+        tud_sof_cb_enable(true);
+        tud_task();
+        IWDG->KR = IWDG_REFRESH; // refresh watch dog
+        HAL_Delay(100);
+        tud_task();
+        IWDG->KR = IWDG_REFRESH; // refresh watch dog
+        tud_connect();
         break;
 
     case CMD_Ping:
@@ -279,54 +204,54 @@ static void uart_poll(void)
 int main(void)
 {
     uint32_t lastT = 0;
-    tusb_rhport_init_t dev_init =
-    {
-        .role = TUSB_ROLE_DEVICE,
-        .speed = TUSB_SPEED_FULL
-    };
 
     sysreset();
-    StartHSE();
-    hw_setup();
+//    StartHSE();
 
     HAL_Init();
 
+    SysTick_Config(SystemCoreClock / 1000);
     SystemClock_Config();
+
+    hw_setup();
 
     MX_GPIO_Init();
 
-    SysTick_Config(SystemCoreClock / 1000);
-
     MX_USART1_UART_Init();
+
+
+    debug_init(&huart1);
+
+    if(RCC->CSR & RCC_CSR_IWDGRSTF)  // watchdog reset occurred
+        debug_println("WDGRESET=1");
+
+    if(RCC->CSR & RCC_CSR_SFTRSTF)  // software reset occurred
+        debug_println("SOFTRESET=1");
 
     RCC->CSR |= RCC_CSR_RMVF; // remove reset flags
 
-    USBPU_OFF();
-    USB_setup();
-    MX_USB_PCD_Init();
-    USBPU_ON();
-
-    debug_init(&huart1);
-    debug_println("=== Auto Switch Pro boot ===");
-
-    init_input_state();
+    debug_println("=== Switch Pro NX-USB boot ===");
 
     // LED on at boot (PB2, active-low)
     HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
 
+    USBPU_OFF();
 
-    // Initialise TinyUSB (resets USB peripheral, opens EP0, enables D+ pull-up + NVIC)
+    HAL_Delay(100);
+
+    USB_setup();
+    MX_USB_PCD_Init();
+
+    init_input_state();
+
     tusb_init(BOARD_TUD_RHPORT, &dev_init);
     tud_sof_cb_enable(true);
 
-
-    // Soft-reconnect: pull D+ low, wait, then re-assert.
-    // The STM32H5 boots so fast that D+ goes high almost instantly after VBUS.
-    // Strict USB hosts (like the Switch dock) need to see a clean transition.
     tud_disconnect();
-    HAL_Delay(2000);
+//    HAL_Delay(500);
     iwdg_setup();
     tud_connect();
+//    USBPU_ON();
 
     debug_println("USB connected, waiting for host...");
 

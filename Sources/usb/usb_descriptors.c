@@ -44,6 +44,7 @@ uint8_t const desc_hid_report[] =
 {
     0x05, 0x01,        // Usage Page (Generic Desktop Ctrls)
     0x15, 0x00,        // Logical Minimum (0)
+
     0x09, 0x04,        // Usage (Joystick)
     0xA1, 0x01,        // Collection (Application)
 
@@ -156,7 +157,7 @@ _Static_assert(sizeof(desc_hid_report) == 203, "HID report descriptor must be 20
 uint8_t const* tud_hid_descriptor_report_cb(uint8_t itf)
 {
     (void)itf;
-    debug_println("[USB] HID Descriptor Report CB");
+//    debug_println("[USB] HID Descriptor Report CB");
     return desc_hid_report;
 }
 
@@ -191,7 +192,8 @@ uint8_t const desc_configuration[] =
     0x00,        // bCountryCode
     0x01,        // bNumDescriptors
     0x22,        // bDescriptorType[0] (HID Report)
-    0xCB, 0x00,  // wDescriptorLength[0] 203
+    sizeof(desc_hid_report),  // wDescriptorLength[0] 203
+    0x00,
 
     // Endpoint IN Descriptor (7 bytes)
     0x07,        // bLength
@@ -212,9 +214,33 @@ uint8_t const desc_configuration[] =
 
 uint8_t const* tud_descriptor_configuration_cb(uint8_t index)
 {
-    debug_println("[USB] Descriptor Config CB");
-    (void)index;
+    // (void)index;
+    debug_print_begin();
+    debug_insert("[USB] Descriptor Config CB, index: ");
+    debug_hex8(index);
+    debug_print_end();
+
     return desc_configuration;
+}
+
+uint8_t const desc_quialifier[] =
+{
+    10,          //bLength
+    0x06,        // bDescriptorType - Device qualifier
+    0x00,        // bcdUSB_L
+    0x02,        // bcdUSB_H
+    0x00,        // bDeviceClass
+    0x00,        // bDeviceSubClass
+    0x00,        // bDeviceProtocol
+    0x40,        // bMaxPacketSize0
+    0x01,        // bNumConfigurations
+    0x00         // Reserved
+};
+
+uint8_t const* tud_descriptor_device_qualifier_cb(void)
+{
+    debug_println("[USB] Descriptor Qualifier CB");
+    return desc_quialifier;
 }
 
 // String Descriptor Index
@@ -224,56 +250,78 @@ enum
     STRID_MANUFACTURER,
     STRID_PRODUCT,
     STRID_SERIAL,
+
+    STRID_END
 };
+
+#define LANG_US  (uint16_t)0x0409
+
+#define USB_STRING(name, str)                  \
+    static const struct  __attribute__((packed)) name \
+    {                          \
+        uint8_t  bLength;                       \
+        uint8_t  bDescriptorType;               \
+        uint16_t bString[(sizeof(str) - 2) / 2]; \
+        \
+    } \
+    name = {sizeof(name), 0x03, str}
+
+#define USB_LANG_ID(name, lng_id)     \
+    \
+    static const struct  __attribute__((packed)) name \
+    {         \
+        uint8_t  bLength;         \
+        uint8_t  bDescriptorType; \
+        uint16_t bString;         \
+        \
+    } \
+    name = {0x04, 0x03, lng_id}
+#define STRING_LANG_DESCRIPTOR_SIZE_BYTE    (4)
 
 // ---- String Descriptors ----
-static char const* string_desc_arr[] =
-{
-    (const char[]){0x09, 0x04},  // 0: Language = English
-    "Nintendo Co., Ltd.",        // 1: Manufacturer
-    "Pro Controller",            // 2: Product
-    "000000000001"               // 3: Serial
-};
-
-static uint16_t _desc_str[64];
+USB_LANG_ID(USB_StringLangDescriptor, LANG_US);
+USB_STRING(USB_StringSerialDescriptor, u"000000000001");
+USB_STRING(USB_StringManufacturingDescriptor, u"Nintendo Co., Ltd.");
+USB_STRING(USB_StringProdDescriptor, u"Pro Controller");
 
 uint16_t const* tud_descriptor_string_cb(uint8_t index, uint16_t langid)
 {
     (void)langid;
-    uint8_t chr_count;
+    uint16_t const* ret = NULL;
 
-    debug_println("[USB] Queried Description String");
+    debug_print_begin();
+    debug_insert("[USB] Queried Description String (index ");
+    debug_hex8(index);
+    debug_insert("):");
 
     switch(index)
     {
     case STRID_LANGID:
-        memcpy(&_desc_str[1], string_desc_arr[0], 2);
-        chr_count = 1;
+        debug_insert("[lang]");
+        ret = (uint16_t const*)&USB_StringLangDescriptor;
+        break;
+
+    case STRID_MANUFACTURER:
+        debug_insert("Manufacturer");
+        ret = (uint16_t const*)&USB_StringManufacturingDescriptor;
+        break;
+
+    case STRID_PRODUCT:
+        debug_insert("Product");
+        ret = (uint16_t const*)&USB_StringProdDescriptor;
         break;
 
     case STRID_SERIAL:
-        memcpy(&_desc_str[1], string_desc_arr[3], 13);
-        chr_count = (uint8_t)strlen(string_desc_arr[3]);
+        debug_insert("Serial");
+        ret = (uint16_t const*)&USB_StringSerialDescriptor;
         break;
 
     default:
-    {
-        if(index >= sizeof(string_desc_arr) / sizeof(string_desc_arr[0]))
-            return NULL;
-
-        const char* str = string_desc_arr[index];
-
-        chr_count = (uint8_t)strlen(str);
-
-        if(chr_count > 63)
-            chr_count = 63;
-
-        for(uint8_t i = 0; i < chr_count; i++)
-            _desc_str[1 + i] = str[i];
-    }
+        ret = NULL;
+        break;
     }
 
-    _desc_str[0] = (uint16_t)((TUSB_DESC_STRING << 8) | (2 * chr_count + 2));
+    debug_print_end();
 
-    return _desc_str;
+    return ret;
 }
