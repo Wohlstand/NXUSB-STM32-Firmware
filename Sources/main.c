@@ -191,6 +191,8 @@ static uint8_t got_data = 0;
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
+    size_t data_size = 0;
+
     if(huart->Instance != USART1)
         return;
 
@@ -199,7 +201,19 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
         if(rx_cmd.cmd != CMD_None && rx_cmd.cmd < CMD_END)
         {
             got_data = 1;
-            HAL_UART_Receive_IT(&huart1, (uint8_t*)&rx_cmd.data, sizeof(rx_cmd) - 1);
+            data_size = sizeof(rx_cmd);
+
+            switch(rx_cmd.cmd)
+            {
+            case CMD_Ping:
+            case CMD_Reset:
+            case CMD_QueryIMU:
+            case CMD_QueryPlayer:
+                data_size = 2;
+                break;
+            }
+
+            HAL_UART_Receive_IT(&huart1, (uint8_t*)&rx_cmd.data, data_size - 1);
         }
         else
             uart_listen();
