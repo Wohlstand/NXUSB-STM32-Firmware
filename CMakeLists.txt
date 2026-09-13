@@ -62,13 +62,14 @@ set(PROJECT_SOURCES
     Sources/hal/stm32f1xx_it.c
     Sources/hal/system_stm32f1xx.c
 
+    Sources/usb/tusb_dev/fsdev_common.c
+    Sources/usb/tusb_dev/dcd_stm32_fsdev.c
+
     # TinyUSB hooks
     3rdparty/tinyusb/src/tusb.c
     3rdparty/tinyusb/src/common/tusb_fifo.c
     3rdparty/tinyusb/src/device/usbd.c
     3rdparty/tinyusb/src/class/hid/hid_device.c
-    3rdparty/tinyusb/src/portable/st/stm32_fsdev/fsdev_common.c
-    3rdparty/tinyusb/src/portable/st/stm32_fsdev/dcd_stm32_fsdev.c
 
     # HAL drivers
     3rdparty/hal/Src/stm32f1xx_hal.c
@@ -96,6 +97,7 @@ set(PROJECT_DEFINES
     -DDEBUG
     # -DHSE_VALUE=8000000U
     -DCFG_TUSB_DEBUG=0
+    -DCFG_TUSB_FSDEV_PMA_SIZE=512u
     -DCFG_TUSB_MCU=OPT_MCU_STM32F1
     -DCFG_TUSB_DEBUG_PRINTF=mine_debug_print
 )

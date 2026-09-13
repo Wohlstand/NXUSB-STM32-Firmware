@@ -64,10 +64,12 @@ static int EP_Init(uint8_t number, uint8_t type, uint16_t txsz, uint16_t rxsz, v
         return 3; // wrong rx buffer size
 
     uint16_t countrx = 0;
-    if(rxsz < 64) countrx = rxsz / 2;
+    if(rxsz < 64)
+        countrx = rxsz / 2;
     else
     {
-        if(rxsz & 0x1f) return 3; // should be multiple of 32
+        if(rxsz & 0x1f)
+            return 3; // should be multiple of 32
         countrx = 31 + rxsz / 32;
     }
 
