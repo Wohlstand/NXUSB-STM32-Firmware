@@ -1,5 +1,5 @@
 /*
- * UART to USB HID proxy for the Nintendo Switch
+ * MIT License
  *
  * Copyright (c) 2026-2026 Vitaly Novichkov
  *
@@ -21,16 +21,3 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-
-#ifndef SOURCES_USART_H_
-#define SOURCES_USART_H_
-
-#include "main.h"
-
-extern UART_HandleTypeDef huart1;
-// extern DMA_HandleTypeDef hdma_tx;
-// extern DMA_HandleTypeDef hdma_rx;
-
-extern void MX_USART1_UART_Init(void);
-
-#endif /* SOURCES_USART_H_ */

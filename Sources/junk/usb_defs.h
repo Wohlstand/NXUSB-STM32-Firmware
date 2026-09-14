@@ -40,8 +40,14 @@
 #define USB_TXBUFSZ             10
 
 #define USB_BTABLE_BASE         0x40006000
+
+#ifndef USB_BASE
 #define USB_BASE                ((uint32_t)0x40005C00)
+#endif
+
+#ifndef USB
 #define USB                     ((USB_TypeDef *) USB_BASE)
+#endif
 
 #ifdef USB_BTABLE
 #undef USB_BTABLE
@@ -87,7 +93,7 @@ typedef struct
     __IO uint32_t FNR;
     __IO uint32_t DADDR;
     __IO uint32_t BTABLE;
-} USB_TypeDef;
+} USB_TypeDef_custom;
 
 typedef struct
 {
