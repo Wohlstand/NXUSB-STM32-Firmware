@@ -259,6 +259,11 @@ static void handle_config_command(uint8_t subcmd)
     }
 }
 
+static void handle_rumble(const uint8_t *data, uint16_t len)
+{
+    debug_rumble(data + 2, 8);
+}
+
 // ---- Handle 0x01 UART subcommands ----
 static void handle_subcommand(const uint8_t *data, uint16_t len)
 {
@@ -273,11 +278,16 @@ static void handle_subcommand(const uint8_t *data, uint16_t len)
     // [14] = subcmd echo
     // [15+] = reply data
 
+    // If rumble data is not zeroed and vibration IS enabled
+    if(pro_state.vibration_enabled)
+        debug_rumble(data + 2, 8);
+
     buf[0] = REPORT_ID_INPUT_21;
     buf[1] = pro_state.report_counter++;
     fill_input_subreport(&buf[2]);
 
     uint8_t subcmd = data[10]; // subcommand ID is at offset 10
+    uint8_t sublen = len > 11 ? len - 11 : 0;
 
     debug_print_begin();
     debug_insert("[01] sub="); debug_hex8(subcmd);
@@ -302,6 +312,53 @@ static void handle_subcommand(const uint8_t *data, uint16_t len)
         buf[13] = 0x82;
         buf[14] = SUBCMD_DEVICE_INFO;
         memcpy(&buf[15], device_info, sizeof(device_info));
+        break;
+
+    case SUBCMD_SET_MODE:
+        if(sublen > 0)
+            pro_state.input_mode = data[11];
+        buf[13] = 0x80;
+        buf[14] = subcmd;
+        break;
+
+    case SUBCMD_TRIGGER_BUTTONS:
+        if(sublen >= 2)
+        {
+            size_t i = 0;
+            for(i = 0; i < 7; ++i)
+                pro_state.button_elapsed[i] = ((data[12u + (i * 2)] << 8) | data[11u + (i * 2)]) * 10u;
+        }
+        buf[13] = 0x83;
+        buf[14] = SUBCMD_TRIGGER_BUTTONS;
+        break;
+
+    case SUBCMD_GET_PAGELIST_STATE:
+        // Replies a uint8 with a value of `x01` if there's a Host list with BD addresses/link keys in memory.
+        buf[13] = 0x80;
+        buf[14] = subcmd;
+        buf[15] = 0x00;
+        break;
+
+    case SUBCMD_SET_HCI_STATE:
+        if(sublen > 0)
+        {
+            pro_state.hci_state_recv = 1;
+            pro_state.hci_state = data[11];
+        }
+        buf[13] = 0x80;
+        buf[14] = subcmd;
+        break;
+
+    case SUBCMD_RESET_PAIR_INFO:
+        // Initialises the 0x2000 SPI section.
+        buf[13] = 0x80;
+        buf[14] = subcmd;
+        break;
+
+    case SUBCMD_SET_SHIPMENT:
+        // Subcommand 0x08: Set shipment low power state
+        buf[13] = 0x80;
+        buf[14] = subcmd;
         break;
 
     case SUBCMD_SPI_READ:
@@ -332,17 +389,103 @@ static void handle_subcommand(const uint8_t *data, uint16_t len)
         break;
     }
 
-    case SUBCMD_SET_MODE:
+    case SUBCMD_SPI_WRITE:
+        // Little-endian int32 address, int8 size. Max size `x1D` data to write.
+        // Replies with `x8011` ACK and a uint8 status. `x00` = success, `x01` = write protected.
+        buf[13] = 0x80;
+        buf[14] = subcmd;
+        buf[15] = 0x01; // Always write protected!, 0x00 is success
+        break;
+
+    case SUBCMD_SPI_SECTOR_ERASE:
+        // Takes a Little-endian uint32. Erases the whole 4KB in the specified address to 0xFF.
+        // Replies with `x8012` ACK and a uint8 status. `x00` = success, `x01` = write protected.
+        buf[13] = 0x80;
+        buf[14] = subcmd;
+        buf[15] = 0x01; // Always write protected!, 0x00 is success
+        break;
+
+    case SUBCMD_RESET_NFC_IR_MCU:
         buf[13] = 0x80;
         buf[14] = subcmd;
         break;
 
-    case SUBCMD_TRIGGER_BUTTONS:
-        buf[13] = 0x83;
-        buf[14] = SUBCMD_TRIGGER_BUTTONS;
+    case SUBCMD_SET_NFC_IR_CONFIG:
+        // Write configuration data to MCU. This data can be IR configuration, NFC configuration or data for the 512KB MCU firmware update.
+        // Takes 38 or 37 bytes long argument data.
+        // Replies with ACK `xA0` `x20` and 34 bytes of data.
+        buf[13] = 0x80; //0xA0;
+        buf[14] = subcmd; // 0x20;
+        memset(buf + 15, 0, 34);
+        break;
+
+    case SUBCMD_SET_NFC_IR_STATE:
+        // Takes one argument:
+        //
+        // | Argument # | Remarks           |
+        // |:----------:| ----------------- |
+        // |   `00`     | Suspend           |
+        // |   `01`     | Resume            |
+        // |   `02`     | Resume for update |
+        buf[13] = 0x80;
+        buf[14] = subcmd;
+        break;
+
+    case SUBCMD_SET_UNK_DATA:
+        // Takes a 38 byte long argument.
+        // Sets a byte to `x01` (enable something?) and sets also an unknown data
+        // (configuration? for NFC/IR MCU?) to the BT device structure that copies it from given argument.
+        // Replies with `x80 24 00` always.
+        buf[13] = 0x80;
+        buf[14] = subcmd;
+        buf[15] = 0x00;
+        break;
+
+    case SUBCMD_RESET_UNK_DATA:
+        // Sets the above byte to `x00` (disable something?) and resets the previous 38 byte data to all zeroes.
+        // Replies with `x80 25 00` always.
+        buf[13] = 0x80;
+        buf[14] = subcmd;
+        buf[15] = 0x00;
+        break;
+
+    case SUBCMD_SET_UNK_NFCIR_DATA:
+        // Takes a 38 byte long argument and copies it to unknown array_222640[96] at &array_222640[3].
+        // Does the same job with OUTPUT report 0x12.
+        // Replies with ACK `x80` `x28`.
+        buf[13] = 0x80;
+        buf[14] = subcmd;
+        break;
+
+    case SUBCMD_GET_NFCIR_MCU_DATA:
+        // Replies with ACK `xA8` `x29` and 34 bytes data, from a different buffer than the one the x28 writes.
+        buf[13] = 0xA8;
+        buf[14] = 0x29;
+        break;
+
+    case SUBCMD_SET_GPIO_OUT_P2:
+        // Takes a uint8_t and sets unknown GPIO Pin 2 at Port 2 to `0` = GPIO_PIN_OUTPUT_LOW` or `1` = GPIO_PIN_OUTPUT_HIGH`.
+        // This normally enables a function. For example, sub-cmd `x48` sets GPIO Pin 7 @Port 2 output value, which disables or enables IMU.
+        // Replies always with ACK `x00` `x2A`.
+        // `x00` as an ACK here is a bug. Developers forgot to add an ACK reply.
+        if(sublen > 0)
+            pro_state.gpio_p2_2 = data[11];
+        buf[13] = 0x00;
+        buf[14] = subcmd;
+
+    case SUBCMD_GET_NFCIR_MCU_DATA_x29:
+        // Replies with ACK `xA9` `x2B` and 20 bytes long data (which has also a part from x24 sub-cmd).
+        buf[13] = 0xA9;
+        buf[14] = 0x29;
         break;
 
     case SUBCMD_SET_PLAYER_LIGHTS:
+        // First argument byte is a bit-field:
+        // ```
+        // aaaa bbbb
+        //      3210 - keep player light on
+        // 3210 - flash player light
+        // ```
         pro_state.player_id = data[11];
         buf[13] = 0x80;
         buf[14] = subcmd;
@@ -363,18 +506,71 @@ static void handle_subcommand(const uint8_t *data, uint16_t len)
         break;
 
     case SUBCMD_IMU_SENSITIVITY:
-    case SUBCMD_ENABLE_VIBRATION:
-    case SUBCMD_SET_SHIPMENT:
-    case SUBCMD_SET_NFC_IR_CONFIG:
-    case SUBCMD_SET_NFC_IR_STATE:
-    case SUBCMD_SET_HOME_LIGHT:
-        // Simple ACK — byte [13] must be 0x80, NOT 0x80|subcmd
+        if(sublen >= 4)
+        {
+            memcpy(pro_state.imu_sense, data + 11, sublen >= 4 ? 4 : sublen);
+            debug_imu_sens(pro_state.imu_sense, 4);
+        }
         buf[13] = 0x80;
         buf[14] = subcmd;
         break;
 
+    case SUBCMD_IMU_REG_WRITE:
+        if(sublen >= 3)
+        {
+            // Send raw registers commands to the LSM6DS3 chip which implements gyroscope and accelerometer
+            debug_imu_reg_write(data + 11, sublen >= 3 ? 3 : sublen);
+        }
+        buf[13] = 0x80;
+        buf[14] = subcmd;
+        break;
+
+    case SUBCMD_ENABLE_VIBRATION:
+        pro_state.vibration_enabled = data[11] == 0x01 ? true : false;
+        buf[13] = 0x82;
+        buf[14] = subcmd;
+        debug_vibro((uint8_t)pro_state.vibration_enabled);
+        break;
+
+    case SUBCMD_SET_HOME_LIGHT:
+        if(sublen > 0)
+        {
+            pro_state.home_light_len = sublen >= 25 ? 25 : sublen;
+            memcpy(pro_state.home_light, data + 11, pro_state.home_light_len);
+            debug_home_light(pro_state.home_light, pro_state.home_light_len);
+        }
+        buf[13] = 0x80;
+        buf[14] = subcmd;
+        break;
+
+    case SUBCMD_GET_REGULATED_VOLT:
+        buf[13] = 0xD0;
+        buf[14] = subcmd;
+        buf[15] = 0x90; // 0x0690
+        buf[16] = 0x06;
+        break;
+
+    case SUBCMD_SET_GPIO_OUT_P1:
+        if(sublen > 0)
+        {
+            pro_state.gpio_p1_7 = (data[11] & 0x04) == 0;
+            pro_state.gpio_p1_15 = (data[11] & 0x10) != 0;
+        }
+        buf[13] = 0x80;
+        buf[14] = subcmd;
+        break;
+
+    case SUBCMD_GET_GPIO_IN_OUT:
+        buf[13] = 0xD1;
+        buf[14] = subcmd;
+        buf[15] = (pro_state.gpio_p0_4 ? 0 : 0x01) |
+                  (pro_state.gpio_p3_2 ? 0 : 0x02) |
+                  (pro_state.gpio_p1_7 ? 0 : 0x04) |
+                  (pro_state.gpio_p1_15 ? 0x08 : 0);
+        break;
+
     default:
-        // Unknown subcommand — plain ACK
+        // Unknown sub-commands — plain ACK
         buf[13] = 0x80;
         buf[14] = subcmd;
         break;
@@ -384,6 +580,7 @@ static void handle_subcommand(const uint8_t *data, uint16_t len)
     // debug_print(" sub="); debug_hex8(buf[14]); debug_print("\r\n");
     queue_response(0, 0, "SubCMD");
 }
+
 
 // ---- Public: process incoming output report from Switch ----
 void switch_pro_handle_output(const uint8_t *data, uint16_t len)
@@ -403,14 +600,13 @@ void switch_pro_handle_output(const uint8_t *data, uint16_t len)
         break;
 
     case REPORT_ID_OUTPUT_01:
-        if (len >= 11)
-        {
+        if(len >= 11)
             handle_subcommand(data, len);
-        }
         break;
 
     case REPORT_ID_OUTPUT_10:
-        // Rumble-only packet — ignore
+        if(len >= 10)
+            handle_rumble(data, len);
         break;
     default:
         break;
@@ -428,6 +624,25 @@ void switch_input_state_reset(void)
     input_state.stick_r[1] = 0x7FF;
 }
 
+void switch_input_set_defaults(void)
+{
+    pro_state.player_id = 0;
+    debug_palyer(0);
+
+    pro_state.imu_enabled = false;
+    debug_imu_state(0);
+
+    pro_state.vibration_enabled = false;
+    debug_vibro(0);
+
+    pro_state.imu_sense[0] = 0x03;
+    pro_state.imu_sense[1] = 0x00;
+    pro_state.imu_sense[2] = 0x00;
+    pro_state.imu_sense[3] = 0x01;
+
+    pro_state.input_mode = REPORT_MODE_STANDARD_FULL;
+}
+
 void switch_init_input_state(void)
 {
     memset(&pro_state, 0, sizeof(input_state));
@@ -443,9 +658,8 @@ void tud_mount_cb(void)
     pro_state.reports_suspended = false;
     pro_state.report_counter = 0;
     report_queued = false;
-    debug_palyer(0);
-    debug_imu_state(0);
     switch_input_state_reset();
+    switch_input_set_defaults();
 }
 
 void switch_query_player(void)
@@ -458,14 +672,29 @@ void switch_query_imu(void)
     debug_imu_state(pro_state.imu_enabled);
 }
 
+void switch_query_vibro(void)
+{
+    debug_vibro(pro_state.vibration_enabled);
+}
+
+void switch_query_config(void)
+{
+    uint8_t msg[3];
+
+    msg[0] = pro_state.player_id;
+    msg[1] = pro_state.imu_enabled;
+    msg[2] = pro_state.vibration_enabled;
+
+    debug_config(msg, sizeof(msg));
+}
+
 void tud_umount_cb(void)
 {
 //    debug_println("[USB] UNMOUNTED");
     pro_state.handshake_done = false;
     pro_state.reports_enabled = false;
     pro_state.reports_suspended = false;
-    debug_palyer(0);
-    debug_imu_state(0);
+    switch_input_set_defaults();
     switch_input_state_reset();
 }
 
@@ -474,8 +703,7 @@ void tud_suspend_cb(bool remote_wakeup_en)
     (void)remote_wakeup_en;
     debug_println("[USB] Suspend");
     pro_state.reports_suspended = true;
-    debug_palyer(0);
-    debug_imu_state(0);
+    switch_input_set_defaults();
 }
 
 void tud_resume_cb(void)
@@ -606,6 +834,30 @@ void switch_update_state(void)
 
     static uint32_t last_report_ms = 0;
     uint32_t now = HAL_GetTick();
+
+    if(pro_state.hci_state_recv)
+    {
+        pro_state.hci_state_recv = 0;
+
+        switch(pro_state.hci_state)
+        {
+        case HCI_STATE_DISCONNECT:
+            debug_println("HCI Requested Disconnect");
+            break;
+
+        case HCI_STATE_REBOOT_AND_RECONNECT:
+            debug_println("HCI Requested Reboot and Reconnect");
+            break;
+
+        case HCI_STATE_REBOOT_TO_PAIRING:
+            debug_println("HCI Requested Reboot and Pairing");
+            break;
+
+        case HCI_STATE_REBOOT_AND_RECONNECT_HOME:
+            debug_println("HCI Requested Reboot and Reconnect (HOME)");
+            break;
+        }
+    }
 
     // Send input reports every 8ms (~125 Hz)
     if(tud_hid_ready() && (now - last_report_ms >= 8))

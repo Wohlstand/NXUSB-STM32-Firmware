@@ -14,10 +14,15 @@ extern void switch_pro_handle_output(const uint8_t *data, uint16_t len);
 
 extern void switch_init_input_state(void);
 
+extern void switch_input_set_defaults(void);
+
 extern void switch_input_state_reset(void);
 
 extern void switch_query_player(void);
 extern void switch_query_imu(void);
+extern void switch_query_vibro(void);
+
+extern void switch_query_config(void);
 
 extern bool switch_pro_send_queued(void);
 
@@ -30,6 +35,8 @@ enum NXCommand
     CMD_Reset = 4,          // 1
     CMD_QueryPlayer = 5,    // 1
     CMD_QueryIMU = 6,       // 1
+    CMD_QueryVibro = 7,     // 1
+    CMD_QueryConfig = 8,     // 1
 
     CMD_END
 };

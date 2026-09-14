@@ -12,9 +12,15 @@ extern void debug_print_begin(void);
 extern void debug_print_end(void);
 
 extern void debug_imu_state(uint8_t enabled);
+extern void debug_vibro(uint8_t enabled);
 extern void debug_palyer(uint8_t player);
 
-extern void debug_rumble(uint8_t *samples, uint8_t size);
+extern void debug_config(const uint8_t *samples, uint8_t size);
+
+extern void debug_rumble(const uint8_t *samples, uint8_t size);
+extern void debug_home_light(const uint8_t *samples, uint8_t size);
+extern void debug_imu_sens(const uint8_t *samples, uint8_t size);
+extern void debug_imu_reg_write(const uint8_t *samples, uint8_t size);
 
 // Print a hex byte
 extern void debug_hex8(uint8_t val);

@@ -275,6 +275,16 @@ static void uart_poll(void)
         switch_query_imu();
         break;
 
+    case CMD_QueryVibro:
+        debug_println("[CMD] Query Vibro");
+        switch_query_vibro();
+        break;
+
+    case CMD_QueryConfig:
+        debug_println("[CMD] Query Player, IMU, Vibro");
+        switch_query_config();
+        break;
+
     case CMD_ButtonsUpdate:
     case CMD_Tilt:
 //        debug_println("[CMD] Update buttons"); // Floods too much@

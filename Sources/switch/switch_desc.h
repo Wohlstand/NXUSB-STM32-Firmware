@@ -20,11 +20,11 @@
 // ---- Report IDs ----
 // Input (device → host)
 #define REPORT_ID_INPUT_30   0x30  // Standard full input report
-#define REPORT_ID_INPUT_21   0x21  // Subcommand reply
+#define REPORT_ID_INPUT_21   0x21  // Sub-command reply
 #define REPORT_ID_INPUT_81   0x81  // 0x80 command reply
 
 // Output (host → device)
-#define REPORT_ID_OUTPUT_01  0x01  // UART subcommand
+#define REPORT_ID_OUTPUT_01  0x01  // UART sub-command
 #define REPORT_ID_OUTPUT_10  0x10  // Rumble only
 #define REPORT_ID_OUTPUT_80  0x80  // Config/handshake command
 
@@ -41,16 +41,34 @@
 #define SUBCMD_DEVICE_INFO        0x02
 #define SUBCMD_SET_MODE           0x03
 #define SUBCMD_TRIGGER_BUTTONS    0x04
+#define SUBCMD_GET_PAGELIST_STATE 0x05
+#define SUBCMD_SET_HCI_STATE      0x06
+#define SUBCMD_RESET_PAIR_INFO    0x07
 #define SUBCMD_SET_SHIPMENT       0x08
 #define SUBCMD_SPI_READ           0x10
+#define SUBCMD_SPI_WRITE          0x11
+#define SUBCMD_SPI_SECTOR_ERASE   0x12
+#define SUBCMD_RESET_NFC_IR_MCU   0x20
 #define SUBCMD_SET_NFC_IR_CONFIG  0x21
 #define SUBCMD_SET_NFC_IR_STATE   0x22
+#define SUBCMD_SET_UNK_DATA       0x24
+#define SUBCMD_RESET_UNK_DATA     0x25
+#define SUBCMD_SET_UNK_NFCIR_DATA 0x28
+#define SUBCMD_GET_NFCIR_MCU_DATA 0x29
+#define SUBCMD_SET_GPIO_OUT_P2    0x2A
+#define SUBCMD_GET_NFCIR_MCU_DATA_x29 0x2B
+
 #define SUBCMD_SET_PLAYER_LIGHTS  0x30
 #define SUBCMD_GET_PLAYER_LIGHTS  0x31
 #define SUBCMD_SET_HOME_LIGHT     0x38
 #define SUBCMD_TOGGLE_IMU         0x40
 #define SUBCMD_IMU_SENSITIVITY    0x41
+#define SUBCMD_IMU_REG_WRITE      0x42
 #define SUBCMD_ENABLE_VIBRATION   0x48
+#define SUBCMD_GET_REGULATED_VOLT 0x50
+#define SUBCMD_SET_GPIO_OUT_P1    0x51
+#define SUBCMD_GET_GPIO_IN_OUT    0x52
+
 
 // ---- Pro Controller Input Report (0x30) ----
 // 3-byte packed 12-bit analogue sticks
@@ -139,6 +157,38 @@ enum NxBtButtons
     BUTTON_END = (BUTTON_ZR << 1)
 };
 
+enum NxReportMode
+{
+    // Used with command `x11`. Active polling for NFC/IR camera data. 0x31 data format must be set first.
+    REPORT_MODE_POLLING_NFC_IR_CAM_DATA = 0x00,
+    // Same as `00`. Active polling mode for NFC/IR MCU configuration data.
+    REPORT_MODE_POLLING_NFC_IR_CAM_MCU_CFG = 0x01,
+    // Same as `00`. Active polling mode for NFC/IR data and configuration. For specific NFC/IR modes
+    REPORT_MODE_POLLING_NFC_IR_DATA_N_CFG = 0x02,
+    // Same as `00`. Active polling mode for IR camera data. For specific IR modes
+    REPORT_MODE_POLLING_IR_CAM_DATA = 0x03,
+    // MCU update state report?
+    REPORT_MODE_MCU_STATE = 0x23,
+    // Standard full mode. Pushes current state @60Hz
+    REPORT_MODE_STANDARD_FULL = 0x30,
+    // NFC/IR mode. Pushes large packets @60Hz
+    REPORT_NFC_IR_MODE = 0x31,
+    // UNKNOWN 0x33
+    REPORT_UNK_x33  = 0x33,
+    // UNKNOWN 0x35
+    REPORT_UNK_x35  = 0x35,
+    // Simple HID mode. Pushes updates with every button press
+    REPORT_SIMPLE_HID  = 0x3F,
+};
+
+enum NcReportHCIState
+{
+    HCI_STATE_DISCONNECT = 0x00,
+    HCI_STATE_REBOOT_AND_RECONNECT = 0x01,
+    HCI_STATE_REBOOT_TO_PAIRING = 0x02,
+    HCI_STATE_REBOOT_AND_RECONNECT_HOME = 0x04
+};
+
 typedef struct
 {
     uint32_t buttons;
@@ -153,37 +203,6 @@ typedef struct
     int16_t  gyro[3];
     uint8_t  gyro_count;
 } switch_pro_input_state_t;
-
-
-//    // byte 0: right-side buttons + triggers
-//    uint8_t btn_y       : 1;
-//    uint8_t btn_x       : 1;
-//    uint8_t btn_b       : 1;
-//    uint8_t btn_a       : 1;
-//    uint8_t btn_rsr     : 1;  // Right SR (JoyCon)
-//    uint8_t btn_rsl     : 1;  // Right SL (JoyCon)
-//    uint8_t btn_r       : 1;
-//    uint8_t btn_zr      : 1;
-//
-//    // byte 1: shared buttons
-//    uint8_t btn_minus   : 1;
-//    uint8_t btn_plus    : 1;
-//    uint8_t btn_rstick  : 1;
-//    uint8_t btn_lstick  : 1;
-//    uint8_t btn_home    : 1;
-//    uint8_t btn_capture : 1;
-//    uint8_t _pad0       : 1;
-//    uint8_t charging    : 1;
-//
-//    // byte 2: left-side buttons + triggers
-//    uint8_t dpad_down   : 1;
-//    uint8_t dpad_up     : 1;
-//    uint8_t dpad_right  : 1;
-//    uint8_t dpad_left   : 1;
-//    uint8_t btn_lsr     : 1;  // Left SR (JoyCon)
-//    uint8_t btn_lsl     : 1;  // Left SL (JoyCon)
-//    uint8_t btn_l       : 1;
-//    uint8_t btn_zl      : 1;
 
 
 typedef struct __attribute__((packed))
@@ -215,10 +234,29 @@ typedef struct
     bool     reports_enabled;       // Switch asked for input reports
     bool     reports_suspended;
     bool     imu_enabled;           // Enable sending of the IMU data
+    bool     vibration_enabled;     // Enable receiving vibration
+    uint8_t  input_mode;            // Input report mode
+    uint16_t button_elapsed[7];
+    uint8_t  hci_state_recv;
+    uint8_t  hci_state;
+
+    uint8_t  gpio_p3_2;
+    uint8_t  gpio_p0_4;
+    uint8_t  gpio_p1_7;
+    uint8_t  gpio_p1_15;
+    // Port 2
+    uint8_t  gpio_p2_2;
+
+    uint8_t  player_id;             // player LED state
+
     uint8_t  imu_data_input[36];    // Input IMU samples, gets copied into report when imu is enabled
+    uint8_t  imu_sense[4];          // IMU sensitivity state
+
+    uint8_t  home_light[25];        // Home light PWM setup
+    uint8_t  home_light_len;
+
     uint8_t  report_counter;        // incrementing time stamp for 0x30
     uint8_t  report_buf[64];        // scratch buffer for responses
-    uint8_t  player_id;             // player LED state
 } switch_pro_state_t;
 
 #endif /* SOURCES_SWITCH_SWITCH_DESC_H_ */

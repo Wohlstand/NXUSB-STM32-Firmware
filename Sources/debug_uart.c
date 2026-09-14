@@ -5,11 +5,16 @@
 //#include <stdbool.h>
 
 static UART_HandleTypeDef *debug_huart = NULL;
-static const char msg_debug = 'd';
-static const char msg_player = 'p';
-static const char msg_imu = 'i';
-static const char msg_rumble = 'r';
-static const char msg_tail = 0x7F;
+static const char msg_debug     = 'd';
+static const char msg_player    = 'p';
+static const char msg_imu       = 'i';
+static const char msg_imusens   = 's';
+static const char msg_imureg    = 'e';
+static const char msg_config    = 'c';
+static const char msg_rumble    = 'r';
+static const char msg_home      = 'h';
+static const char msg_vibro     = 'v';
+static const char msg_tail      = 0x7F;
 //static const char msg_tail = '\n';
 
 static const size_t     log_buffer_max = 1024;
@@ -101,80 +106,7 @@ void debug_insert(const char *str)
     log_insert((const uint8_t*)str, strlen(str));
 }
 
-void debug_imu_state(uint8_t enabled)
-{
-    HAL_StatusTypeDef ret;
-    static uint8_t msg[3];
-
-    if(!debug_huart)
-        return;
-
-    msg[0] = msg_imu;
-    msg[1] = enabled;
-    msg[2] = msg_tail;
-
-    while(debug_huart->gState != HAL_UART_STATE_READY);
-
-    ret = HAL_UART_Transmit_IT(debug_huart, msg, sizeof(msg));
-
-    if(ret != HAL_OK)
-    {
-        /* Transfer error in reception process */
-        Error_Handler();
-    }
-}
-
-void debug_palyer(uint8_t player)
-{
-    HAL_StatusTypeDef ret;
-    static uint8_t msg[3];
-
-    if(!debug_huart)
-        return;
-
-    msg[0] = msg_player;
-
-    switch(player)
-    {
-    case 0x01:
-    case 0x10:
-        msg[1] = 1;
-        break;
-
-    case 0x03:
-    case 0x30:
-        msg[1] = 2;
-        break;
-
-    case 0x07:
-    case 0x70:
-        msg[1] = 3;
-        break;
-
-    case 0x0F:
-    case 0xF0:
-        msg[1] = 4;
-        break;
-
-    default:
-        msg[1] = 0;
-        break;
-    }
-
-    msg[2] = msg_tail;
-
-    while(debug_huart->gState != HAL_UART_STATE_READY);
-
-    ret = HAL_UART_Transmit_IT(debug_huart, msg, sizeof(msg));
-
-    if(ret != HAL_OK)
-    {
-        /* Transfer error in reception process */
-        Error_Handler();
-    }
-}
-
-void debug_rumble(uint8_t *samples, uint8_t size)
+static void debug_write_chunk(const char *head, const uint8_t *samples, uint8_t size)
 {
     if(!debug_huart)
         return;
@@ -184,9 +116,74 @@ void debug_rumble(uint8_t *samples, uint8_t size)
     log_buffer[0] = 0;
     log_buffer_length = 0;
 
-    log_insert((const uint8_t*)&msg_rumble, 1);
+    log_insert((const uint8_t*)head, 1);
     log_insert(samples, (uint16_t)size);
     debug_print_end();
+}
+
+static void debug_write_byte(const char *head, uint8_t byte)
+{
+    HAL_StatusTypeDef ret;
+    static uint8_t msg[3];
+
+    if(!debug_huart)
+        return;
+
+    msg[0] = (uint8_t)*head;
+    msg[1] = byte;
+    msg[2] = msg_tail;
+
+    while(debug_huart->gState != HAL_UART_STATE_READY);
+
+    ret = HAL_UART_Transmit_IT(debug_huart, msg, sizeof(msg));
+
+    if(ret != HAL_OK)
+    {
+        /* Transfer error in reception process */
+        Error_Handler();
+    }
+}
+
+void debug_imu_state(uint8_t enabled)
+{
+    debug_write_byte(&msg_imu, enabled);
+}
+
+void debug_imu_sens(const uint8_t *samples, uint8_t size)
+{
+    debug_write_chunk(&msg_imusens, samples, size);
+}
+
+void debug_imu_reg_write(const uint8_t *samples, uint8_t size)
+{
+    debug_write_chunk(&msg_imureg, samples, size);
+}
+
+void debug_vibro(uint8_t enabled)
+{
+    debug_write_byte(&msg_vibro, enabled);
+}
+
+void debug_palyer(uint8_t player)
+{
+    debug_write_byte(&msg_player, player);
+}
+
+void debug_config(const uint8_t *samples, uint8_t size)
+{
+    debug_write_chunk(&msg_config, samples, size);
+}
+
+
+
+void debug_rumble(const uint8_t *samples, uint8_t size)
+{
+    debug_write_chunk(&msg_rumble, samples, size);
+}
+
+void debug_home_light(const uint8_t *samples, uint8_t size)
+{
+    debug_write_chunk(&msg_home, samples, size);
 }
 
 static const char hex_chars[] = "0123456789ABCDEF";
