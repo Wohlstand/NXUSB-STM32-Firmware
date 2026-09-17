@@ -644,18 +644,15 @@ void switch_input_state_reset(void)
 void switch_input_set_defaults(void)
 {
     pro_state.player_id = 0;
-    debug_palyer(0);
-
     pro_state.imu_enabled = false;
-    debug_imu_state(0);
-
     pro_state.vibration_enabled = false;
-    debug_vibro(0);
 
     pro_state.imu_sense[0] = 0x03;
     pro_state.imu_sense[1] = 0x00;
     pro_state.imu_sense[2] = 0x00;
     pro_state.imu_sense[3] = 0x01;
+
+    switch_query_config();
 
     pro_state.input_mode = REPORT_MODE_STANDARD_FULL;
 }

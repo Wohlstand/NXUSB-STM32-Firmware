@@ -216,6 +216,8 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
             case CMD_Reset:
             case CMD_QueryIMU:
             case CMD_QueryPlayer:
+            case CMD_QueryVibro:
+            case CMD_QueryConfig:
                 data_size = 2;
                 break;
             }
