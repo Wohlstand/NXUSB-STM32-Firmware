@@ -333,7 +333,7 @@ static void hwff_pull_n(const tu_fifo_t *f, void *app_buf, uint16_t n, uint16_t 
       for (uint8_t i = 0; i < lin_odd; ++i) {
         buf_temp[i] = ff_buf[i];
       }
-      for (uint8_t i = 0; i < wrap_odd; ++i) {
+      for (uint8_t i = 0; i < wrap_odd && lin_odd + i < 4; ++i) {
         buf_temp[lin_odd + i] = f->buffer[i];
       }
 
