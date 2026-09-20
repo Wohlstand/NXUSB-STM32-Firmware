@@ -201,6 +201,10 @@ static void fill_input_subreport(uint8_t *buf)
     // 0x7FF packed: {0xFF, 0xF7, 0x7F} matching GP2040-CE
     buf[4] = 0xFF; buf[5] = 0xF7; buf[6] = 0x7F;
     buf[7] = 0xFF; buf[8] = 0xF7; buf[9] = 0x7F;
+
+    // Vibration status
+    if(pro_state.vibration_enabled)
+        buf[10] = pro_state.vibration_status;
 }
 
 // ---- Queue a response report ----
@@ -276,9 +280,36 @@ static void handle_config_command(uint8_t subcmd)
     }
 }
 
+static const uint8_t c_rumbleNeutral[8] = {0x00, 0x01, 0x40, 0x40, 0x00, 0x01, 0x40, 0x40};
+
+static void vibration_cycle(void)
+{
+    // Update status at 0x08 and up to 0x0C
+    if(pro_state.vibration_status == 0x08)
+        pro_state.vibration_status = 0x09;
+    else if(pro_state.vibration_status == 0x09)
+        pro_state.vibration_status = 0x0A;
+    else if(pro_state.vibration_status == 0x0A)
+        pro_state.vibration_status = 0x0B;
+    else if(pro_state.vibration_status == 0x0B)
+        pro_state.vibration_status = 0x0C;
+}
+
 static void handle_rumble(const uint8_t *data, uint16_t len)
 {
+    if(memcmp(data + 2, c_rumbleNeutral, 8) == 0)
+    {
+        if(pro_state.vibration_last_neutral)
+            return;
+
+        pro_state.vibration_last_neutral = true;
+    }
+    else
+        pro_state.vibration_last_neutral = false;
+
     debug_rumble(data + 2, 8);
+
+    pro_state.vibration_status = 0x08;
 }
 
 // ---- Handle 0x01 UART subcommands ----
@@ -297,7 +328,7 @@ static void handle_subcommand(const uint8_t *data, uint16_t len)
 
     // If rumble data is not zeroed and vibration IS enabled
     if(pro_state.vibration_enabled)
-        debug_rumble(data + 2, 8);
+        handle_rumble(data , 10);
 
     buf[0] = REPORT_ID_INPUT_21;
     buf[1] = pro_state.report_counter++;
@@ -544,7 +575,7 @@ static void handle_subcommand(const uint8_t *data, uint16_t len)
 
     case SUBCMD_ENABLE_VIBRATION:
         pro_state.vibration_enabled = data[11] == 0x01 ? true : false;
-        buf[13] = 0x82;
+        buf[13] = 0x80;
         buf[14] = subcmd;
         debug_vibro((uint8_t)pro_state.vibration_enabled);
         break;
@@ -646,6 +677,9 @@ void switch_input_set_defaults(void)
     pro_state.player_id = 0;
     pro_state.imu_enabled = false;
     pro_state.vibration_enabled = false;
+
+    pro_state.vibration_status = 0x00;
+    pro_state.vibration_last_neutral = false;
 
     pro_state.imu_sense[0] = 0x03;
     pro_state.imu_sense[1] = 0x00;
@@ -878,6 +912,10 @@ void switch_update_state(void)
     {
         last_report_ms = now;
 
+        // Initialise the vibration engine
+        if(!pro_state.vibration_last_neutral && pro_state.vibration_status != 0x00)
+            vibration_cycle();
+
         switch_pro_report_t report;
         memset(&report, 0, sizeof(report));
         report.report_id = REPORT_ID_INPUT_30;
@@ -895,7 +933,7 @@ void switch_update_state(void)
             memcpy(report.imu_data, pro_state.imu_data_input, sizeof(report.imu_data));
 
         // Vibro-motor report
-        report.rumble_report = 0x00;
+        report.rumble_report = pro_state.vibration_status;
 
         report.input.m_button_status[0] = (input_state.buttons >> 16) & 0xFF;
         report.input.m_button_status[1] = ((input_state.buttons >> 8) & 0xFF) | ((BUTTON_CHARGING >> 8) & 0xFF);

@@ -252,6 +252,8 @@ typedef struct
     bool     reports_suspended;
     bool     imu_enabled;           // Enable sending of the IMU data
     bool     vibration_enabled;     // Enable receiving vibration
+    uint8_t  vibration_status;
+    bool     vibration_last_neutral;
     uint8_t  input_mode;            // Input report mode
     uint16_t button_elapsed[7];
     uint8_t  hci_state_recv;
