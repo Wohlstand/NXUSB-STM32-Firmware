@@ -32,34 +32,34 @@ UART_HandleTypeDef huart1;
 
 void MX_USART1_UART_Init(void)
 {
-    uint32_t tmout = 16000000;
+//    uint32_t tmout = 16000000;
 //    __HAL_RCC_USART1_CLK_ENABLE();
     memset(&huart1, 0, sizeof(UART_HandleTypeDef));
 
-    RCC->APB2ENR |= RCC_APB2ENR_IOPAEN | RCC_APB2ENR_USART1EN;
-    RCC->AHBENR |= RCC_AHBENR_DMA1EN;
+//    RCC->APB2ENR |= RCC_APB2ENR_IOPAEN | RCC_APB2ENR_USART1EN;
+//    RCC->AHBENR |= RCC_AHBENR_DMA1EN;
+//
+//    DMA1_Channel4->CCR |= DMA_CCR_MINC | DMA_CCR_DIR | DMA_CCR_TCIE;
+//    NVIC_SetPriority(DMA1_Channel4_IRQn, 3);
 
-    DMA1_Channel4->CCR |= DMA_CCR_MINC | DMA_CCR_DIR | DMA_CCR_TCIE;
-    NVIC_SetPriority(DMA1_Channel4_IRQn, 3);
+//    USART1->BRR = 72000000 / 115200;
+//    USART1->CR1 = USART_CR1_TE | USART_CR1_RE | USART_CR1_UE;
+//
+//    while(!(USART1->SR & USART_SR_TC))
+//    {
+//        if(--tmout == 0) break;   // polling idle frame Transmission
+//    }
+//
+//    USART1->SR = 0; // clear flags
+//    USART1->CR1 |= USART_CR1_RXNEIE;
+//    USART1->CR3 = USART_CR3_DMAT;
 
-    USART1->BRR = 72000000 / 115200;
-    USART1->CR1 = USART_CR1_TE | USART_CR1_RE | USART_CR1_UE;
-
-    while(!(USART1->SR & USART_SR_TC))
-    {
-        if(--tmout == 0) break;   // polling idle frame Transmission
-    }
-
-    USART1->SR = 0; // clear flags
-    USART1->CR1 |= USART_CR1_RXNEIE;
-    USART1->CR3 = USART_CR3_DMAT;
-
-    NVIC_SetPriority(USART1_IRQn, 0);
+//    NVIC_SetPriority(USART1_IRQn, 0);
 
     huart1.Instance = USART1;
     huart1.Init.BaudRate = 115200;
     huart1.Init.WordLength = UART_WORDLENGTH_8B;
-    huart1.Init.StopBits = UART_STOPBITS_1;
+    huart1.Init.StopBits = UART_STOPBITS_2;
     huart1.Init.Parity = UART_PARITY_NONE;
     huart1.Init.Mode = UART_MODE_TX_RX;
     huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;

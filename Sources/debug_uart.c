@@ -43,7 +43,8 @@ static const char msg_tail      = 0x7F;
 
 static const size_t     log_buffer_max = 1024;
 static uint16_t         log_buffer_length = 0;
-static uint8_t          log_buffer[1024 + 1] = {0};
+static uint8_t          log_buffer[2][1024 + 1] = {{0}, {0}};
+static uint8_t          log_toggle = 0;
 
 
 void mine_debug_print(const char *format, ...)
@@ -69,7 +70,7 @@ static void log_insert(const uint8_t *buff, uint16_t len)
     if(len == 0)
         return; // Nothing to add
 
-    memcpy(log_buffer + log_buffer_length, buff, len);
+    memcpy(log_buffer[log_toggle] + log_buffer_length, buff, len);
     log_buffer_length += len;
 }
 
@@ -95,7 +96,7 @@ void debug_print_begin(void)
 
     while(debug_huart->gState != HAL_UART_STATE_READY);
 
-    log_buffer[0] = 0;
+    log_buffer[log_toggle][0] = 0;
     log_buffer_length = 0;
 
     log_insert((const uint8_t*)&msg_debug, 1);
@@ -112,14 +113,18 @@ void debug_print_end(void)
 
     while(debug_huart->gState != HAL_UART_STATE_READY);
 
-    ret = HAL_UART_Transmit_IT(debug_huart, (const uint8_t *)&log_buffer, log_buffer_length);
+    ret = HAL_UART_Transmit_IT(debug_huart, (const uint8_t *)&log_buffer[log_toggle], log_buffer_length);
 
     if(ret != HAL_OK)
     {
-        log_buffer[0] = ret;
+        log_buffer[log_toggle][0] = ret;
         /* Transfer error in reception process */
         Error_Handler();
     }
+
+    ++log_toggle;
+    if(log_toggle >= 2)
+        log_toggle = 0;
 }
 
 void debug_insert(const char *str)
@@ -137,7 +142,7 @@ static void debug_write_chunk(const char *head, const uint8_t *samples, uint8_t 
 
     while(debug_huart->gState != HAL_UART_STATE_READY);
 
-    log_buffer[0] = 0;
+    log_buffer[log_toggle][0] = 0;
     log_buffer_length = 0;
 
     log_insert((const uint8_t*)head, 1);
@@ -148,24 +153,29 @@ static void debug_write_chunk(const char *head, const uint8_t *samples, uint8_t 
 static void debug_write_byte(const char *head, uint8_t byte)
 {
     HAL_StatusTypeDef ret;
-    static uint8_t msg[3];
+    static uint8_t msg[2][3];
+    static uint8_t msg_toggle = 0;
 
     if(!debug_huart)
         return;
 
-    msg[0] = (uint8_t)*head;
-    msg[1] = byte;
-    msg[2] = msg_tail;
-
     while(debug_huart->gState != HAL_UART_STATE_READY);
 
-    ret = HAL_UART_Transmit_IT(debug_huart, msg, sizeof(msg));
+    msg[msg_toggle][0] = (uint8_t)*head;
+    msg[msg_toggle][1] = byte;
+    msg[msg_toggle][2] = msg_tail;
+
+    ret = HAL_UART_Transmit_IT(debug_huart, msg[msg_toggle], sizeof(msg[msg_toggle]));
 
     if(ret != HAL_OK)
     {
         /* Transfer error in reception process */
         Error_Handler();
     }
+
+    ++msg_toggle;
+    if(msg_toggle >= 2)
+        msg_toggle = 0;
 }
 
 void debug_imu_state(uint8_t enabled)
