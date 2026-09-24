@@ -44,12 +44,25 @@ void MX_GPIO_Init(void)
 //    GPIO_InitStruct.Pull = GPIO_NOPULL;
 //    HAL_GPIO_Init(user_button_GPIO_Port, &GPIO_InitStruct);
 
-    /*Configure GPIO pin : LED_Pin */
+    /*Configure GPIO pin : On-Board LED_Pin */
     GPIO_InitStruct.Pin = LED_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
     HAL_GPIO_Init(LED_GPIO_Port, &GPIO_InitStruct);
+
+    /* OPTIONAL EXTERNAL LEDS */
+    GPIO_InitStruct.Pin = LED_EXT_RED;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(LED_EXT_GPIO_PORT, &GPIO_InitStruct);
+
+    GPIO_InitStruct.Pin = LED_EXT_GREEN;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(LED_EXT_GPIO_PORT, &GPIO_InitStruct);
 
 //    /**USART1 GPIO Configuration
 //    PA9     ------> USART1_TX
@@ -70,4 +83,34 @@ void MX_GPIO_Init(void)
     GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+}
+
+void led_on_onboard(int on)
+{
+    HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, on ? GPIO_PIN_RESET : GPIO_PIN_SET);
+}
+
+void led_toggle_oboard(void)
+{
+    HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+}
+
+void led_on_red(int on)
+{
+    HAL_GPIO_WritePin(LED_EXT_GPIO_PORT, LED_EXT_RED, on ? GPIO_PIN_RESET : GPIO_PIN_SET);
+}
+
+void led_toggle_red(void)
+{
+    HAL_GPIO_TogglePin(LED_EXT_GPIO_PORT, LED_EXT_RED);
+}
+
+void led_on_green(int on)
+{
+    HAL_GPIO_WritePin(LED_EXT_GPIO_PORT, LED_EXT_GREEN, on ? GPIO_PIN_RESET : GPIO_PIN_SET);
+}
+
+void led_toggle_green(void)
+{
+    HAL_GPIO_TogglePin(LED_EXT_GPIO_PORT, LED_EXT_GREEN);
 }

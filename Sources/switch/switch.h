@@ -88,6 +88,8 @@ struct __attribute__((packed)) NXSendCmd
     uint8_t tail;
 };
 
+extern bool switch_pro_active(void);
+
 extern void switch_receive(const struct NXSendCmd *in);
 
 extern void switch_update_state(void);

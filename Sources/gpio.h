@@ -29,4 +29,13 @@
 
 extern void MX_GPIO_Init(void);
 
+extern void led_on_onboard(int on);
+extern void led_toggle_oboard(void);
+
+extern void led_on_red(int on);
+extern void led_toggle_red(void);
+
+extern void led_on_green(int on);
+extern void led_toggle_green(void);
+
 #endif /* SOURCES_GPIO_H_ */

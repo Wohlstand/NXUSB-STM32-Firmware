@@ -33,5 +33,9 @@ void Error_Handler(void);
 #define LED_Pin GPIO_PIN_13
 #define LED_GPIO_Port GPIOC
 
+#define LED_EXT_RED GPIO_PIN_8
+#define LED_EXT_GREEN GPIO_PIN_9
+#define LED_EXT_GPIO_PORT GPIOB
+
 
 #endif /* SOURCES_MAIN_H_ */

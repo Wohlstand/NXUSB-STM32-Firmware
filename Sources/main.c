@@ -344,7 +344,9 @@ int main(void)
     debug_println("=== Switch Pro NX-USB boot ===");
 
     // LED on at boot (PB2, active-low)
-    HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
+    led_on_onboard(1);
+    led_on_red(1);
+    led_on_green(1);
 
     USB_init_workaround();
     MX_USB_PCD_Init();
@@ -352,6 +354,9 @@ int main(void)
 //    tud_disconnect();
 //    tusb_deinit(0);
 //    HAL_Delay(1000);
+
+    led_on_red(0);
+    led_on_green(0);
 
     tusb_init(BOARD_TUD_RHPORT, &dev_init);
 //    tud_disconnect();
@@ -386,7 +391,19 @@ int main(void)
 
         if(lastT > t || t - lastT > 499)
         {
-            HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+            led_toggle_oboard();
+
+            if(switch_pro_active())
+            {
+                led_on_green(1);
+                led_toggle_red();
+            }
+            else
+            {
+                led_on_green(0);
+                led_toggle_red();
+            }
+
             lastT = t;
         }
 

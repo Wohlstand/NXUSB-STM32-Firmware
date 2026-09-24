@@ -843,7 +843,10 @@ bool switch_pro_send_queued(void)
     return true;
 }
 
-
+bool switch_pro_active(void)
+{
+    return pro_state.handshake_done && !pro_state.reports_suspended;
+}
 
 void switch_receive(const struct NXSendCmd *in)
 {
