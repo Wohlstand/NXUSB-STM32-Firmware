@@ -11,6 +11,8 @@ STM32CubeIDE, который можно [загрузить на сайте ра
 
 Для связи с устройством требуется [программа-клиент](/Wohlstand/NXUSB-UART-Client).
 
+Данный проект выпущен под [лиценией MIT](LICENSE.txt).
+
 ## Устройство в сборе
 
 ![external](images/photos/controller-external.jpg)
